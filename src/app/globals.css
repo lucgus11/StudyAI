@@ -51,7 +51,12 @@
   }
 
   .card-hover {
-    @apply card transition-all duration-200 hover:border-brand-600/50 hover:shadow-lg hover:shadow-brand-900/20;
+    @apply bg-surface-900 border border-surface-800 rounded-xl p-6
+           transition-all duration-200;
+  }
+  .card-hover:hover {
+    @apply border-brand-600 shadow-lg;
+    box-shadow: 0 10px 15px -3px rgb(79 70 229 / 0.1);
   }
 
   /* ---- Buttons ---- */
@@ -63,21 +68,32 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 text-sm;
+    @apply btn bg-brand-600 text-white px-5 py-2.5 text-sm;
+  }
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-brand-500;
   }
 
   .btn-secondary {
-    @apply btn bg-surface-800 hover:bg-surface-700 border border-surface-600
-           text-slate-200 px-5 py-2.5 text-sm;
+    @apply btn bg-surface-800 border border-surface-600 text-slate-200 px-5 py-2.5 text-sm;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    @apply bg-surface-700;
   }
 
   .btn-ghost {
-    @apply btn text-slate-400 hover:text-slate-100 hover:bg-surface-800 px-3 py-2 text-sm;
+    @apply btn text-slate-400 px-3 py-2 text-sm;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    @apply text-slate-100 bg-surface-800;
   }
 
   .btn-danger {
-    @apply btn bg-danger-500/10 hover:bg-danger-500/20 text-danger-400
-           border border-danger-500/30 px-5 py-2.5 text-sm;
+    @apply btn text-danger-400 border border-danger-500 px-5 py-2.5 text-sm;
+    background-color: rgb(239 68 68 / 0.1);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background-color: rgb(239 68 68 / 0.2);
   }
 
   /* ---- Form elements ---- */
@@ -98,15 +114,18 @@
   }
 
   .badge-brand {
-    @apply badge bg-brand-900/50 text-brand-300 border border-brand-700/50;
+    @apply badge text-brand-300 border border-brand-700;
+    background-color: rgb(99 102 241 / 0.15);
   }
 
   .badge-accent {
-    @apply badge bg-accent-900/30 text-accent-400 border border-accent-600/30;
+    @apply badge text-accent-400 border border-accent-600;
+    background-color: rgb(16 185 129 / 0.1);
   }
 
   .badge-warn {
-    @apply badge bg-warn-900/30 text-warn-400 border border-warn-600/30;
+    @apply badge text-warn-400 border border-warn-500;
+    background-color: rgb(245 158 11 / 0.1);
   }
 
   /* ---- Section title ---- */
@@ -121,7 +140,9 @@
 
   /* ---- Glassmorphism panel ---- */
   .glass {
-    @apply bg-surface-900/60 backdrop-blur-xl border border-white/5;
+    @apply backdrop-blur-xl border border-white;
+    background-color: rgb(15 23 42 / 0.6);
+    border-color: rgb(255 255 255 / 0.05);
   }
 }
 
