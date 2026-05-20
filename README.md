@@ -217,4 +217,4 @@ Toutes les tables ont **Row Level Security (RLS)** activé — les utilisateurs 
 
 ## 📄 Licence
 
-MIT — libre d'utilisation, de modification et de distribution.
+CC 4.0
