@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Monitor, Zap, Target, Download, ArrowLeft } from "lucide-react";
+import { Monitor, Zap, Target, MessageSquare, ArrowLeft } from "lucide-react";
 import DownloadOfflineButton from "@/components/pwa/DownloadOfflineButton";
 import GrandEcranPanel from "@/components/revision/GrandEcranPanel";
 
@@ -30,13 +30,22 @@ export default async function CourseDetailPage({ params }: Props) {
       href: null, // inline panel below
     },
     {
-      id: "micro-learning",
-      label: "Micro-Learning",
-      description: "Flashcards & mini-quiz pour sessions courtes",
+      id: "flashcards",
+      label: "Flashcards",
+      description: "Cartes recto/verso pour mémoriser les notions clés",
       icon: Zap,
       color: "from-accent-600 to-accent-700",
       badge: "Actif rapide",
       href: `/dashboard/courses/${course.id}/flashcards`,
+    },
+    {
+      id: "quiz",
+      label: "Mini-Quiz",
+      description: "QCM & Vrai/Faux générés par l'IA pour tester tes connaissances",
+      icon: MessageSquare,
+      color: "from-brand-500 to-brand-700",
+      badge: "Actif rapide",
+      href: `/dashboard/courses/${course.id}/quiz`,
     },
     {
       id: "crash-test",
@@ -70,7 +79,7 @@ export default async function CourseDetailPage({ params }: Props) {
       </div>
 
       {/* Mode selector cards */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {modes.map((mode) => {
           const Icon = mode.icon;
           const card = (
