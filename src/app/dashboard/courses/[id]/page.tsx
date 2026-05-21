@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Monitor, Zap, Target, MessageSquare, ArrowLeft } from "lucide-react";
+import type { Course } from "@/types";
 import DownloadOfflineButton from "@/components/pwa/DownloadOfflineButton";
 import GrandEcranPanel from "@/components/revision/GrandEcranPanel";
 
@@ -18,6 +19,7 @@ export default async function CourseDetailPage({ params }: Props) {
     .single();
 
   if (error || !course) notFound();
+  const typedCourse = course as unknown as Course;
 
   const modes = [
     {
@@ -36,7 +38,7 @@ export default async function CourseDetailPage({ params }: Props) {
       icon: Zap,
       color: "from-accent-600 to-accent-700",
       badge: "Actif rapide",
-      href: `/dashboard/courses/${course.id}/flashcards`,
+      href: `/dashboard/courses/${typedCourse.id}/flashcards`,
     },
     {
       id: "quiz",
@@ -45,7 +47,7 @@ export default async function CourseDetailPage({ params }: Props) {
       icon: MessageSquare,
       color: "from-brand-500 to-brand-700",
       badge: "Actif rapide",
-      href: `/dashboard/courses/${course.id}/quiz`,
+      href: `/dashboard/courses/${typedCourse.id}/quiz`,
     },
     {
       id: "crash-test",
@@ -54,7 +56,7 @@ export default async function CourseDetailPage({ params }: Props) {
       icon: Target,
       color: "from-warn-500 to-orange-600",
       badge: "Actif intense",
-      href: `/dashboard/courses/${course.id}/exam`,
+      href: `/dashboard/courses/${typedCourse.id}/exam`,
     },
   ];
 
@@ -71,10 +73,10 @@ export default async function CourseDetailPage({ params }: Props) {
         </Link>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="section-title">{course.title}</h1>
-            <p className="text-slate-400 mt-1">{course.subject}</p>
+            <h1 className="section-title">{typedCourse.title}</h1>
+            <p className="text-slate-400 mt-1">{typedCourse.subject}</p>
           </div>
-          <DownloadOfflineButton course={course} />
+          <DownloadOfflineButton course={typedCourse} />
         </div>
       </div>
 
@@ -109,7 +111,7 @@ export default async function CourseDetailPage({ params }: Props) {
       </div>
 
       {/* Grand Écran – inline split panel */}
-      <GrandEcranPanel course={course} />
+      <GrandEcranPanel course={typedCourse} />
     </div>
   );
 }
