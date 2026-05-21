@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import FlashcardDeck from "@/components/revision/FlashcardDeck";
 import QuizPanel from "@/components/revision/QuizPanel";
+import type { Flashcard, QuizQuestion } from "@/types";
 
 interface Props {
   params: { id: string };
@@ -47,7 +48,7 @@ export default async function FlashcardsPage({ params }: Props) {
           </span>
         </h2>
         {Array.isArray(course.flashcards) && course.flashcards.length > 0 ? (
-          <FlashcardDeck flashcards={course.flashcards} courseId={course.id} />
+          <FlashcardDeck flashcards={course.flashcards as Flashcard[]} courseId={course.id} />
         ) : (
           <div className="card text-center py-10 text-slate-400">
             Aucune flashcard générée pour ce cours.
@@ -64,7 +65,7 @@ export default async function FlashcardsPage({ params }: Props) {
           </span>
         </h2>
         {Array.isArray(course.quiz_questions) && course.quiz_questions.length > 0 ? (
-          <QuizPanel questions={course.quiz_questions} courseId={course.id} />
+          <QuizPanel questions={course.quiz_questions as QuizQuestion[]} courseId={course.id} />
         ) : (
           <div className="card text-center py-10 text-slate-400">
             Aucun quiz généré pour ce cours.
