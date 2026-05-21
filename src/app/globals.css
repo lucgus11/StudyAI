@@ -193,3 +193,31 @@
     radial-gradient(at 80% 90%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
     radial-gradient(at 60% 40%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
 }
+
+/* ---- Summary HTML content (GrandEcranPanel) ---- */
+.summary-content h3 {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.summary-content p {
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.summary-content ul {
+  padding-left: 1rem;
+  margin-bottom: 0.75rem;
+  color: #94a3b8;
+}
+.summary-content li {
+  margin-bottom: 0.25rem;
+  list-style-type: disc;
+}
+.summary-content strong {
+  color: #e2e8f0;
+  font-weight: 600;
+}
