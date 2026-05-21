@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+
+  const errorParam = searchParams.get("error");
+  const successParam = searchParams.get("success");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,12 +25,14 @@ export default function LoginPage() {
         password: form.password,
       });
       if (error) throw error;
+
       toast.success("Connexion réussie !");
-      router.push("/dashboard");
-      router.refresh();
+
+      // Redirection via window.location pour forcer un rechargement complet
+      // et laisser le middleware Supabase lire les nouveaux cookies de session
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion");
-    } finally {
       setLoading(false);
     }
   };
@@ -36,6 +41,24 @@ export default function LoginPage() {
     <div className="card animate-slide-up">
       <h1 className="font-display text-2xl font-bold text-slate-50 mb-1">Connexion</h1>
       <p className="text-slate-400 text-sm mb-6">Accède à ton espace de révision</p>
+
+      {errorParam && (
+        <div className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
+          style={{ backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {errorParam === "lien_invalide_ou_expire"
+            ? "Le lien de confirmation est invalide ou a expiré. Réessaie de t'inscrire."
+            : errorParam}
+        </div>
+      )}
+
+      {successParam === "email_confirme" && (
+        <div className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
+          style={{ backgroundColor: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#34d399" }}>
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          Email confirmé ! Tu peux maintenant te connecter.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -49,6 +72,7 @@ export default function LoginPage() {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="input pl-10"
               placeholder="ton@email.com"
+              disabled={loading}
             />
           </div>
         </div>
@@ -64,6 +88,7 @@ export default function LoginPage() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="input pl-10"
               placeholder="••••••••"
+              disabled={loading}
             />
           </div>
         </div>
@@ -76,7 +101,7 @@ export default function LoginPage() {
 
       <p className="text-center text-sm text-slate-400 mt-5">
         Pas encore de compte ?{" "}
-        <Link href="/auth/register" className="text-brand-400 hover:text-brand-300 font-medium">
+        <Link href="/auth/register" className="font-medium" style={{ color: "#818cf8" }}>
           S&apos;inscrire
         </Link>
       </p>
