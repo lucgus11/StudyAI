@@ -17,12 +17,13 @@ export default async function ExamPage({ params }: Props) {
     .single();
 
   if (error || !course) notFound();
+  const c = course as { id: string; title: string; subject: string };
 
   return (
     <div className="space-y-6 pb-20 md:pb-0 animate-fade-in">
       <div>
         <Link
-          href={`/dashboard/courses/${course.id}`}
+          href={`/dashboard/courses/${c.id}`}
           className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -30,14 +31,14 @@ export default async function ExamPage({ params }: Props) {
         </Link>
         <h1 className="section-title">
           🎯 Crash Test –{" "}
-          <span className="text-slate-400 font-medium text-xl">{course.title}</span>
+          <span className="text-slate-400 font-medium text-xl">{c.title}</span>
         </h1>
         <p className="text-slate-400 text-sm mt-1">
           Examen blanc chronométré avec correction et feedback détaillé par l&apos;IA.
         </p>
       </div>
 
-      <ExamPanel courseId={course.id} courseTitle={course.title} />
+      <ExamPanel courseId={c.id} courseTitle={c.title} />
     </div>
   );
 }
