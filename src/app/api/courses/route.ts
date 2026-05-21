@@ -149,20 +149,25 @@ export async function GET() {
  */
 async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
-    // Dynamic import to avoid SSR issues
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.js");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjsLib: any = await import("pdfjs-dist/legacy/build/pdf.js");
     const pdfData = new Uint8Array(arrayBuffer);
-    const loadingTask = pdfjsLib.getDocument({ data: pdfData, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
+    const loadingTask = pdfjsLib.getDocument({
+      data: pdfData,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
     const pdf = await loadingTask.promise;
 
     let fullText = "";
-    const maxPages = Math.min(pdf.numPages, 20); // Cap at 20 pages for performance
+    const maxPages = Math.min(pdf.numPages, 20);
 
     for (let i = 1; i <= maxPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: { str?: string }) => item.str ?? "")
+      const pageText = (content.items as Array<{ str?: string }>)
+        .map((item) => item.str ?? "")
         .join(" ");
       fullText += pageText + "\n";
     }
