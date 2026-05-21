@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * STUDYAI – IndexedDB Client (via idb library)
  *

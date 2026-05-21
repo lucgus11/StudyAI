@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * STUDYAI – Background Sync Service
  *
