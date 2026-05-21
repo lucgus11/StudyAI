@@ -4,194 +4,177 @@
 
 /* ============================================================
    STUDYAI – Global Styles
+   IMPORTANT: @apply only uses standard Tailwind classes.
+   Custom color classes (surface-*, brand-*, etc.) use raw CSS vars.
    ============================================================ */
 
 @layer base {
-  :root {
-    --color-brand: 99 102 241;
-    --color-accent: 16 185 129;
-    --color-surface: 15 23 42;
-    --radius: 0.75rem;
-  }
+  * { box-sizing: border-box; }
 
-  * {
-    box-sizing: border-box;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
+  html { scroll-behavior: smooth; }
 
   body {
-    background-color: theme("colors.surface.950");
-    color: theme("colors.slate.100");
+    background-color: #020617; /* surface-950 */
+    color: #f1f5f9;            /* slate-100 */
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: theme("colors.surface.900");
-  }
-  ::-webkit-scrollbar-thumb {
-    background: theme("colors.surface.700");
-    border-radius: 99px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: theme("colors.brand.600");
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
 }
 
 @layer components {
+
   /* ---- Cards ---- */
   .card {
-    @apply bg-surface-900 border border-surface-800 rounded-xl p-6;
+    @apply rounded-xl p-6;
+    background-color: #0f172a;
+    border: 1px solid #1e293b;
   }
 
   .card-hover {
-    @apply bg-surface-900 border border-surface-800 rounded-xl p-6
-           transition-all duration-200;
+    @apply rounded-xl p-6 transition-all duration-200;
+    background-color: #0f172a;
+    border: 1px solid #1e293b;
   }
   .card-hover:hover {
-    @apply border-brand-600 shadow-lg;
-    box-shadow: 0 10px 15px -3px rgb(79 70 229 / 0.1);
+    border-color: #4f46e5;
+    box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.12);
   }
 
   /* ---- Buttons ---- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 font-display font-semibold
-           rounded-lg transition-all duration-200 focus:outline-none focus:ring-2
-           focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-surface-950
+    @apply inline-flex items-center justify-center gap-2
+           font-semibold rounded-lg transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2
            disabled:opacity-50 disabled:cursor-not-allowed;
+    font-family: var(--font-syne), sans-serif;
+    --tw-ring-color: #6366f1;
+    --tw-ring-offset-color: #020617;
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white px-5 py-2.5 text-sm;
+    @apply btn text-white px-5 py-2.5 text-sm;
+    background-color: #4f46e5;
   }
   .btn-primary:hover:not(:disabled) {
-    @apply bg-brand-500;
+    background-color: #6366f1;
   }
 
   .btn-secondary {
-    @apply btn bg-surface-800 border border-surface-600 text-slate-200 px-5 py-2.5 text-sm;
+    @apply btn text-slate-200 px-5 py-2.5 text-sm;
+    background-color: #1e293b;
+    border: 1px solid #475569;
   }
   .btn-secondary:hover:not(:disabled) {
-    @apply bg-surface-700;
+    background-color: #334155;
   }
 
   .btn-ghost {
     @apply btn text-slate-400 px-3 py-2 text-sm;
+    background-color: transparent;
   }
   .btn-ghost:hover:not(:disabled) {
-    @apply text-slate-100 bg-surface-800;
+    color: #f1f5f9;
+    background-color: #1e293b;
   }
 
   .btn-danger {
-    @apply btn text-danger-400 border border-danger-500 px-5 py-2.5 text-sm;
-    background-color: rgb(239 68 68 / 0.1);
+    @apply btn text-red-400 px-5 py-2.5 text-sm;
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
   }
   .btn-danger:hover:not(:disabled) {
-    background-color: rgb(239 68 68 / 0.2);
+    background-color: rgba(239, 68, 68, 0.2);
   }
 
   /* ---- Form elements ---- */
   .input {
-    @apply w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5
-           text-sm text-slate-100 placeholder-slate-500
-           focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500
+    @apply w-full rounded-lg px-4 py-2.5 text-sm
+           focus:outline-none focus:ring-1
            transition-colors duration-150;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+    --tw-ring-color: #6366f1;
   }
+  .input::placeholder { color: #64748b; }
+  .input:focus { border-color: #6366f1; }
 
   .label {
     @apply block text-sm font-medium text-slate-300 mb-1.5;
   }
 
-  /* ---- Badge ---- */
+  /* ---- Badges ---- */
   .badge {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
   .badge-brand {
-    @apply badge text-brand-300 border border-brand-700;
-    background-color: rgb(99 102 241 / 0.15);
+    @apply badge text-indigo-300;
+    background-color: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.4);
   }
 
   .badge-accent {
-    @apply badge text-accent-400 border border-accent-600;
-    background-color: rgb(16 185 129 / 0.1);
+    @apply badge text-emerald-400;
+    background-color: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
   }
 
   .badge-warn {
-    @apply badge text-warn-400 border border-warn-500;
-    background-color: rgb(245 158 11 / 0.1);
+    @apply badge text-amber-400;
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
   }
 
   /* ---- Section title ---- */
   .section-title {
-    @apply font-display text-2xl font-bold text-slate-50;
+    @apply text-2xl font-bold text-slate-50;
+    font-family: var(--font-syne), sans-serif;
   }
 
   /* ---- Gradient text ---- */
   .gradient-text {
-    @apply bg-gradient-to-r from-brand-400 to-accent-400 bg-clip-text text-transparent;
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #818cf8, #34d399);
   }
 
-  /* ---- Glassmorphism panel ---- */
+  /* ---- Glass panel ---- */
   .glass {
-    @apply backdrop-blur-xl border border-white;
-    background-color: rgb(15 23 42 / 0.6);
-    border-color: rgb(255 255 255 / 0.05);
+    @apply backdrop-blur-xl;
+    background-color: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
 
-  /* Flip card utilities */
-  .perspective {
-    perspective: 1000px;
-  }
-
-  .preserve-3d {
-    transform-style: preserve-3d;
-  }
-
-  .backface-hidden {
-    backface-visibility: hidden;
-  }
-
-  .rotate-y-180 {
-    transform: rotateY(180deg);
-  }
+  /* Flip card */
+  .perspective    { perspective: 1000px; }
+  .preserve-3d    { transform-style: preserve-3d; }
+  .backface-hidden { backface-visibility: hidden; }
+  .rotate-y-180   { transform: rotateY(180deg); }
 }
 
-/* ---- PWA install prompt animation ---- */
+/* ---- PWA install animation ---- */
 @keyframes slideUpFade {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 .animate-slide-up-fade {
   animation: slideUpFade 0.4s ease-out forwards;
 }
 
-/* ---- Mesh background gradient ---- */
+/* ---- Mesh background ---- */
 .bg-mesh {
-  background-color: theme("colors.surface.950");
+  background-color: #020617;
   background-image:
-    radial-gradient(at 20% 10%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 90%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
-    radial-gradient(at 60% 40%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
+    radial-gradient(at 20% 10%, rgba(99,102,241,0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 90%, rgba(16,185,129,0.08) 0px, transparent 50%),
+    radial-gradient(at 60% 40%, rgba(99,102,241,0.06) 0px, transparent 50%);
 }
 
 /* ---- Summary HTML content (GrandEcranPanel) ---- */
