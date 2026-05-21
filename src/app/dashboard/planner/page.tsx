@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import PlannerForm from "@/components/planner/PlannerForm";
 import PlannerCalendar from "@/components/planner/PlannerCalendar";
+import type { StudyDay, StudyPlan } from "@/types";
 
 export default async function PlannerPage() {
   const supabase = createClient();
@@ -23,13 +24,13 @@ export default async function PlannerPage() {
       <div className="grid xl:grid-cols-5 gap-6">
         {/* Form – left col */}
         <div className="xl:col-span-2">
-          <PlannerForm existingPlan={plan} />
+          <PlannerForm existingPlan={plan as unknown as StudyPlan} />
         </div>
 
         {/* Calendar – right col */}
         <div className="xl:col-span-3">
           {plan?.plan_data ? (
-            <PlannerCalendar days={plan.plan_data} generatedAt={plan.generated_at} />
+            <PlannerCalendar days={plan.plan_data as unknown as StudyDay[]} generatedAt={plan.generated_at as string} />
           ) : (
             <div className="card flex flex-col items-center justify-center py-20 text-center">
               <div className="text-5xl mb-4">📅</div>
