@@ -16,7 +16,7 @@ export default function GrandEcranPanel({ course }: Props) {
 
   if (!course.summary && !course.glossary && !course.key_concepts) {
     return (
-      <div className="card border-warn-700/30 bg-warn-900/10">
+      <div className="card border-warn-700 bg-surface-900">
         <p className="text-warn-400 text-sm">
           ⚠️ L&apos;analyse IA n&apos;a pas encore été générée pour ce cours. Reviens dans quelques instants.
         </p>
@@ -79,13 +79,10 @@ export default function GrandEcranPanel({ course }: Props) {
 
         {/* Tab content */}
         <div className="p-5">
+          {/* Summary — rendered as HTML with inline styles instead of prose plugin */}
           {activeTab === "summary" && (
             <div
-              className="prose prose-invert prose-sm max-w-none
-                prose-headings:font-display prose-headings:text-slate-200
-                prose-p:text-slate-400 prose-li:text-slate-400
-                prose-h3:text-base prose-h3:font-semibold prose-h3:mb-2 prose-h3:mt-4
-                prose-ul:pl-4 prose-ul:space-y-1"
+              className="summary-content text-sm leading-relaxed"
               dangerouslySetInnerHTML={{
                 __html: course.summary ?? "<p>Résumé non disponible.</p>",
               }}
@@ -104,7 +101,7 @@ export default function GrandEcranPanel({ course }: Props) {
                       onClick={() =>
                         setExpandedTerm(expandedTerm === item.term ? null : item.term)
                       }
-                      className="w-full flex items-center justify-between p-3.5 text-left hover:bg-surface-800/50 transition-colors"
+                      className="w-full flex items-center justify-between p-3.5 text-left hover:bg-surface-800 transition-colors"
                     >
                       <span className="font-medium text-brand-300 text-sm">{item.term}</span>
                       <ChevronDown
@@ -132,7 +129,8 @@ export default function GrandEcranPanel({ course }: Props) {
                 (course.key_concepts as string[]).map((concept, i) => (
                   <div
                     key={i}
-                    className="px-3 py-1.5 rounded-xl bg-brand-900/30 border border-brand-700/40 text-brand-300 text-sm font-medium"
+                    className="px-3 py-1.5 rounded-xl border border-brand-700 text-brand-300 text-sm font-medium"
+                    style={{ backgroundColor: "rgb(99 102 241 / 0.15)" }}
                   >
                     {concept}
                   </div>

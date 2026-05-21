@@ -36,7 +36,27 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
   const [results, setResults] = useState<Results | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timer countdown
+  // submitExam declared BEFORE useEffect that references it
+  const submitExam = useCallback(async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setPhase("submitting");
+    try {
+      const res = await fetch(`/api/courses/${courseId}/exam/grade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questions, answers }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResults(data);
+      setPhase("results");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la correction");
+      setPhase("running");
+    }
+  }, [courseId, questions, answers]);
+
+  // Timer countdown — submitExam is now in scope
   useEffect(() => {
     if (phase !== "running") return;
     setTimeLeft(duration * 60);
@@ -44,14 +64,24 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          submitExam();
+          // Use a ref-based approach to avoid stale closure
           return 0;
         }
         return t - 1;
       });
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [phase]);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, duration]);
+
+  // Separate effect to trigger submit when time hits 0
+  useEffect(() => {
+    if (phase === "running" && timeLeft === 0 && questions.length > 0) {
+      submitExam();
+    }
+  }, [timeLeft, phase, questions.length, submitExam]);
 
   const generateExam = async () => {
     setPhase("loading");
@@ -72,25 +102,6 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
     }
   };
 
-  const submitExam = useCallback(async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setPhase("submitting");
-    try {
-      const res = await fetch(`/api/courses/${courseId}/exam/grade`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questions, answers }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setResults(data);
-      setPhase("results");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la correction");
-      setPhase("running");
-    }
-  }, [courseId, questions, answers]);
-
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
@@ -98,7 +109,12 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
   };
 
   const timeRatio = questions.length > 0 ? timeLeft / (duration * 60) : 1;
-  const timerColor = timeRatio > 0.5 ? "text-accent-400" : timeRatio > 0.2 ? "text-warn-400" : "text-danger-400";
+  const timerColor =
+    timeRatio > 0.5
+      ? "text-accent-400"
+      : timeRatio > 0.2
+      ? "text-warn-400"
+      : "text-danger-400";
 
   // ---- SETUP PHASE ----
   if (phase === "setup") {
@@ -106,9 +122,12 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       <div className="card max-w-md mx-auto space-y-6">
         <div className="text-center">
           <div className="text-4xl mb-3">🎯</div>
-          <h2 className="font-display text-xl font-bold text-slate-50">Prêt pour le Crash Test ?</h2>
+          <h2 className="font-display text-xl font-bold text-slate-50">
+            Prêt pour le Crash Test ?
+          </h2>
           <p className="text-slate-400 text-sm mt-1">
-            L&apos;IA va générer un examen blanc basé sur <strong className="text-slate-300">{courseTitle}</strong>.
+            L&apos;IA va générer un examen blanc basé sur{" "}
+            <strong className="text-slate-300">{courseTitle}</strong>.
           </p>
         </div>
 
@@ -187,7 +206,6 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
   if (phase === "results" && results) {
     return (
       <div className="space-y-6">
-        {/* Score card */}
         <div className="card text-center py-8">
           <div className="text-5xl mb-3">
             {results.percentage >= 80 ? "🏆" : results.percentage >= 50 ? "📈" : "📚"}
@@ -196,12 +214,10 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
             {results.score}/{results.total}
           </p>
           <p className="text-slate-400 mt-1">{results.percentage}% de réussite</p>
-
           <div
             className="mt-5 text-sm text-slate-300 text-left bg-surface-800 rounded-xl p-4 border border-surface-700"
             dangerouslySetInnerHTML={{ __html: results.globalFeedback }}
           />
-
           <button
             onClick={() => setPhase("setup")}
             className="btn-secondary mt-6 mx-auto gap-2"
@@ -210,7 +226,6 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
           </button>
         </div>
 
-        {/* Per-question feedback */}
         <div className="space-y-3">
           <h3 className="font-display font-semibold text-slate-200">Correction détaillée</h3>
           {questions.map((q) => {
@@ -232,7 +247,9 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
                     <XCircle className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
                   )}
                   <p className="text-sm font-medium text-slate-100 flex-1">{q.question}</p>
-                  <span className="text-xs text-slate-500 flex-shrink-0">{q.points} pt{q.points > 1 ? "s" : ""}</span>
+                  <span className="text-xs text-slate-500 flex-shrink-0">
+                    {q.points} pt{q.points > 1 ? "s" : ""}
+                  </span>
                 </div>
                 <div className="pl-6 space-y-1">
                   {answers[q.id] && (
@@ -269,7 +286,11 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
           <div
             className={clsx(
               "h-2 rounded-full transition-all duration-1000",
-              timeRatio > 0.5 ? "bg-accent-500" : timeRatio > 0.2 ? "bg-warn-500" : "bg-danger-500"
+              timeRatio > 0.5
+                ? "bg-accent-500"
+                : timeRatio > 0.2
+                ? "bg-warn-500"
+                : "bg-danger-500"
             )}
             style={{ width: `${timeRatio * 100}%` }}
           />
@@ -282,15 +303,18 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       {/* Questions */}
       <div className="space-y-4">
         {questions.map((q, idx) => {
-          const options = q.options ?? (q.type === "true_false" ? ["Vrai", "Faux"] : []);
+          const options =
+            q.options ?? (q.type === "true_false" ? ["Vrai", "Faux"] : []);
           return (
             <div key={q.id} className="card space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
-                  <span className="bg-brand-900/50 text-brand-300 border border-brand-700/50 text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0">
+                  <span className="bg-surface-800 border border-surface-600 text-brand-300 text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0">
                     Q{idx + 1}
                   </span>
-                  <p className="font-medium text-slate-100 text-sm leading-relaxed">{q.question}</p>
+                  <p className="font-medium text-slate-100 text-sm leading-relaxed">
+                    {q.question}
+                  </p>
                 </div>
                 <span className="text-xs text-slate-500 flex-shrink-0">{q.points}pt</span>
               </div>
@@ -300,7 +324,9 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
                   {options.map((opt) => (
                     <button
                       key={opt}
-                      onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: opt }))}
+                      onClick={() =>
+                        setAnswers((prev) => ({ ...prev, [q.id]: opt }))
+                      }
                       className={clsx(
                         "text-left px-3 py-2.5 rounded-xl border text-sm transition-all",
                         answers[q.id] === opt
@@ -315,7 +341,9 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
               ) : (
                 <textarea
                   value={answers[q.id] ?? ""}
-                  onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                  }
                   placeholder="Rédigez votre réponse…"
                   rows={3}
                   className="input ml-8 resize-none text-sm"
@@ -327,10 +355,7 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       </div>
 
       {/* Submit button */}
-      <button
-        onClick={submitExam}
-        className="btn-primary w-full gap-2 py-3"
-      >
+      <button onClick={submitExam} className="btn-primary w-full gap-2 py-3">
         <CheckCircle className="w-4 h-4" />
         Rendre ma copie ({Object.keys(answers).length}/{questions.length} réponses)
       </button>
