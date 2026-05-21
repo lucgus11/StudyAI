@@ -18,7 +18,9 @@ export default async function QuizPage({ params }: Props) {
 
   if (error || !course) notFound();
 
-  const questions = Array.isArray(course.quiz_questions) ? course.quiz_questions : [];
+  const questions: import("@/types").QuizQuestion[] = Array.isArray(course.quiz_questions)
+    ? (course.quiz_questions as import("@/types").QuizQuestion[])
+    : [];
 
   return (
     <div className="space-y-6 pb-20 md:pb-0 animate-fade-in max-w-2xl mx-auto">
