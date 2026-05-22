@@ -2,8 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Middleware helper: refreshes the Supabase auth session on every request
- * and redirects unauthenticated users away from protected routes.
+ * Middleware: uniquement rafraîchir les tokens Supabase expirés.
+ * La protection des routes est gérée dans les layouts Server Components
+ * (dashboard/layout.tsx) qui lisent les cookies correctement.
+ *
+ * NE PAS faire de redirections ici — le middleware s'exécute avant que
+ * les cookies posés par le client JS soient disponibles dans la request,
+ * ce qui cause des boucles de redirection après signInWithPassword().
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -24,35 +29,19 @@ export async function updateSession(request: NextRequest) {
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options as Parameters<typeof supabaseResponse.cookies.set>[2])
+            supabaseResponse.cookies.set(
+              name,
+              value,
+              options as Parameters<typeof supabaseResponse.cookies.set>[2]
+            )
           );
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-
-  // Protected routes – redirect to login if not authenticated
-  const protectedPaths = ["/dashboard"];
-  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
-
-  if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
-  }
-
-  // Already authenticated – redirect away from auth pages
-  if (user && (pathname === "/auth/login" || pathname === "/auth/register")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
+  // Rafraîchir le token si expiré — ne pas utiliser le résultat pour rediriger
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }
