@@ -11,37 +11,23 @@ function LoginMessages() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
   const successParam = searchParams.get("success");
-
   if (!errorParam && !successParam) return null;
-
   return (
     <>
       {errorParam && (
-        <div
-          className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
-          style={{
-            backgroundColor: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            color: "#f87171",
-          }}
-        >
+        <div className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
+          style={{ backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {errorParam === "lien_invalide_ou_expire"
-            ? "Le lien de confirmation est invalide ou a expiré."
+            ? "Lien invalide ou expiré. Réessaie de t'inscrire."
             : errorParam}
         </div>
       )}
       {successParam === "email_confirme" && (
-        <div
-          className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
-          style={{
-            backgroundColor: "rgba(16,185,129,0.1)",
-            border: "1px solid rgba(16,185,129,0.3)",
-            color: "#34d399",
-          }}
-        >
+        <div className="flex items-center gap-2 p-3 rounded-xl mb-4 text-sm"
+          style={{ backgroundColor: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#34d399" }}>
           <CheckCircle className="w-4 h-4 flex-shrink-0" />
-          Email confirmé ! Tu peux maintenant te connecter.
+          Email confirmé ! Tu peux te connecter.
         </div>
       )}
     </>
@@ -63,12 +49,19 @@ function LoginForm() {
       });
 
       if (error) throw error;
+      if (!data.session) throw new Error("Session non créée");
 
-      if (data.session) {
-        toast.success("Connexion réussie !");
-        // Redirection dure — contourne le Service Worker et le router Next.js
-        document.location.replace("/dashboard");
-      }
+      toast.success("Connexion réussie !");
+
+      // Attendre que les cookies soient écrits par le SDK Supabase
+      // puis naviguer via une URL absolue avec un timestamp pour forcer
+      // le navigateur à ne pas servir de cache
+      setTimeout(() => {
+        window.location.assign(
+          `${window.location.origin}/dashboard?t=${Date.now()}`
+        );
+      }, 300);
+
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion");
       setLoading(false);
@@ -92,7 +85,6 @@ function LoginForm() {
           />
         </div>
       </div>
-
       <div>
         <label className="label">Mot de passe</label>
         <div className="relative">
@@ -108,7 +100,6 @@ function LoginForm() {
           />
         </div>
       </div>
-
       <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
         {loading ? "Connexion..." : "Se connecter"}
@@ -122,13 +113,10 @@ export default function LoginPage() {
     <div className="card animate-slide-up">
       <h1 className="font-display text-2xl font-bold text-slate-50 mb-1">Connexion</h1>
       <p className="text-slate-400 text-sm mb-6">Accède à ton espace de révision</p>
-
       <Suspense fallback={null}>
         <LoginMessages />
       </Suspense>
-
       <LoginForm />
-
       <p className="text-center text-sm text-slate-400 mt-5">
         Pas encore de compte ?{" "}
         <Link href="/auth/register" className="font-medium" style={{ color: "#818cf8" }}>
