@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
 
-// Composant séparé pour useSearchParams → doit être dans un Suspense
 function LoginMessages() {
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
@@ -50,9 +49,21 @@ function LoginMessages() {
 }
 
 function LoginForm() {
+  const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+
+  // Écouter le changement de session Supabase et naviguer quand c'est prêt
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        router.replace("/dashboard");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,13 +74,22 @@ function LoginForm() {
         password: form.password,
       });
       if (error) throw error;
-      toast.success("Connexion réussie !");
-      window.location.href = "/dashboard";
+      setLoggedIn(true);
+      // La redirection est gérée par onAuthStateChange ci-dessus
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion");
       setLoading(false);
     }
   };
+
+  if (loggedIn) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#6366f1" }} />
+        <p className="text-slate-400 text-sm">Redirection en cours…</p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -119,7 +139,6 @@ export default function LoginPage() {
       <h1 className="font-display text-2xl font-bold text-slate-50 mb-1">Connexion</h1>
       <p className="text-slate-400 text-sm mb-6">Accède à ton espace de révision</p>
 
-      {/* useSearchParams doit être dans un Suspense en Next.js 14 */}
       <Suspense fallback={null}>
         <LoginMessages />
       </Suspense>
