@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+type CookieToSet = { name: string; value: string; options?: Record<string, unknown> };
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
@@ -9,8 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 });
     }
 
-    // Collecter les cookies à poser APRÈS le login
-    const cookiesToSet: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    const cookiesToSet: CookieToSet[] = [];
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,9 +21,8 @@ export async function POST(request: NextRequest) {
           getAll() {
             return request.cookies.getAll();
           },
-          setAll(cookies) {
-            // Stocker les cookies pour les appliquer sur la réponse finale
-            cookies.forEach((c) => cookiesToSet.push(c as typeof cookiesToSet[0]));
+          setAll(cookies: CookieToSet[]) {
+            cookies.forEach((c) => cookiesToSet.push(c));
           },
         },
       }
@@ -37,10 +37,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Construire la réponse finale APRÈS avoir récupéré les cookies
     const response = NextResponse.json({ success: true });
 
-    // Poser tous les cookies de session sur la réponse
     cookiesToSet.forEach(({ name, value, options }) => {
       response.cookies.set(name, value, {
         httpOnly: true,
@@ -55,9 +53,6 @@ export async function POST(request: NextRequest) {
 
   } catch (err: unknown) {
     console.error("[POST /api/auth/login]", err);
-    return NextResponse.json(
-      { error: "Erreur serveur interne" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur interne" }, { status: 500 });
   }
 }
