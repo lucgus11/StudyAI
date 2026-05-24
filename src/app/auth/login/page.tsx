@@ -3,7 +3,6 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
 
@@ -35,32 +34,31 @@ function LoginMessages() {
 }
 
 function LoginForm() {
-  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
+      // Login via API route serveur → cookies posés côté serveur via Set-Cookie
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, password: form.password }),
+        credentials: "include", // inclure les cookies dans la réponse
       });
 
-      if (error) throw error;
-      if (!data.session) throw new Error("Session non créée");
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error ?? "Erreur de connexion");
 
       toast.success("Connexion réussie !");
 
-      // Attendre que les cookies soient écrits par le SDK Supabase
-      // puis naviguer via une URL absolue avec un timestamp pour forcer
-      // le navigateur à ne pas servir de cache
-      setTimeout(() => {
-        window.location.assign(
-          `${window.location.origin}/dashboard?t=${Date.now()}`
-        );
-      }, 300);
+      // Les cookies sont maintenant dans le navigateur via Set-Cookie de la response.
+      // Navigation directe vers le dashboard.
+      window.location.href = "/dashboard";
 
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion");
