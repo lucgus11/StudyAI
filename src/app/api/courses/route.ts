@@ -3,6 +3,10 @@ import { generateCourseAnalysis, generateFlashcards, generateQuiz } from "@/lib/
 import { getAuthenticatedUser } from "@/lib/supabase/api";
 
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+// Config pour augmenter la limite de taille du body (PDFs jusqu'à 25 Mo)
+export const fetchCache = "force-no-store";
 
 export async function POST(req: NextRequest) {
   const { user, supabase, error: authError } = await getAuthenticatedUser(req);
@@ -11,38 +15,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const formData = await req.formData();
-    const title = formData.get("title") as string;
-    const subject = formData.get("subject") as string;
-    const pdfFile = formData.get("pdf") as File | null;
+    // Recevoir JSON (le PDF a déjà été uploadé côté client vers Supabase Storage)
+    const body = await req.json();
+    const { title, subject, pdfPath = null, pdfUrl = null } = body;
 
     if (!title || !subject) {
       return NextResponse.json({ error: "Titre et matière requis" }, { status: 400 });
-    }
-
-    // 1. Upload PDF to Supabase Storage (if provided)
-    let pdfPath: string | null = null;
-    let pdfUrl: string | null = null;
-
-    if (pdfFile && pdfFile.size > 0) {
-      const fileName = `${user.id}/${Date.now()}_${pdfFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const arrayBuffer = await pdfFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("course-pdfs")
-        .upload(fileName, buffer, {
-          contentType: "application/pdf",
-          upsert: false,
-        });
-
-      if (uploadError) throw new Error(`Erreur upload: ${uploadError.message}`);
-      pdfPath = uploadData.path;
-
-      const { data: urlData } = supabase.storage
-        .from("course-pdfs")
-        .getPublicUrl(pdfPath);
-      pdfUrl = urlData.publicUrl;
     }
 
     // 2. Create course record immediately
@@ -60,18 +38,15 @@ export async function POST(req: NextRequest) {
 
     if (insertError) throw new Error(`Erreur BDD: ${insertError.message}`);
 
-    // 3. Extract PDF text if available
+    // 3. Extraire le texte du PDF depuis Supabase Storage (si disponible)
     let extractedText = "";
-    if (pdfFile && pdfFile.size > 0) {
+    if (pdfUrl) {
       try {
-        // Basic text extraction via PDF.js on server is complex —
-        // we use the raw text content approach for server-side.
-        // For production, consider a dedicated PDF parsing service.
-        // Here we send the PDF as base64 to a text extraction helper.
-        const arrayBuffer = await pdfFile.arrayBuffer();
+        const pdfResponse = await fetch(pdfUrl);
+        const arrayBuffer = await pdfResponse.arrayBuffer();
         extractedText = await extractTextFromPDF(arrayBuffer);
       } catch {
-        extractedText = `Cours sur le sujet : ${subject}. Titre : ${title}.`;
+        extractedText = `Cours intitulé "${title}" sur la matière "${subject}".`;
       }
     } else {
       extractedText = `Cours intitulé "${title}" sur la matière "${subject}". 
