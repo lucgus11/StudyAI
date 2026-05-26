@@ -30,27 +30,45 @@ export default function UploadCourseButton() {
     if (!form.title || !form.subject) { toast.error("Remplis le titre et la matière"); return; }
 
     setLoading(true);
-    setStep("uploading");
 
     try {
-      // Récupérer le token de session depuis le SDK client
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non authentifié");
+      const token = session.access_token;
 
-      const formData = new FormData();
-      formData.append("title", form.title);
-      formData.append("subject", form.subject);
-      if (file) formData.append("pdf", file);
+      let pdfPath: string | null = null;
+      let pdfUrl: string | null = null;
 
+      // Étape 1 : Upload PDF directement vers Supabase Storage depuis le navigateur
+      if (file) {
+        setStep("uploading");
+        const fileName = `${session.user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("course-pdfs")
+          .upload(fileName, file, { contentType: "application/pdf", upsert: false });
+
+        if (uploadError) throw new Error(`Upload échoué: ${uploadError.message}`);
+        pdfPath = uploadData.path;
+
+        const { data: urlData } = supabase.storage.from("course-pdfs").getPublicUrl(pdfPath);
+        pdfUrl = urlData.publicUrl;
+      }
+
+      // Étape 2 : Envoyer uniquement les métadonnées à l'API (JSON léger, pas de fichier)
       setStep("analyzing");
-
       const res = await fetch("/api/courses", {
         method: "POST",
         headers: {
-          // Envoyer le token JWT dans le header Authorization
-          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify({
+          title: form.title,
+          subject: form.subject,
+          pdfPath,
+          pdfUrl,
+        }),
       });
 
       const data = await res.json();
@@ -71,7 +89,7 @@ export default function UploadCourseButton() {
 
   const stepLabels = {
     idle: "",
-    uploading: "Téléversement du PDF…",
+    uploading: "Téléversement du PDF vers le stockage…",
     analyzing: "L'IA analyse ton cours (peut prendre 30s)…",
   };
 
