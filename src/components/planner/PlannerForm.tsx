@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
+import { createClient } from "@/lib/supabase/client";
 import type { ExamInput, StudyPlan } from "@/types";
 
 const DAY_OPTIONS = [
@@ -63,9 +64,12 @@ export default function PlannerForm({ existingPlan }: Props) {
     }
     setLoading(true);
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
       const res = await fetch("/api/planner", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           exams: validExams,
           weeksBeforeStart,
