@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/api";
 import { generateExam } from "@/lib/groq/client";
 
 export const maxDuration = 60;
@@ -13,9 +13,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  const { user, supabase, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !supabase) return NextResponse.json({ error: authError ?? "Non authentifié" }, { status: 401 });
 
   try {
     const { duration = 60 } = await req.json();
