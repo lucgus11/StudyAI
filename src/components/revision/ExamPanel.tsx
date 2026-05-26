@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Timer, Play, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { clsx } from "clsx";
+import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import type { ExamQuestion } from "@/types";
 
@@ -41,9 +42,12 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
     if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
     try {
+      const supabase2 = createClient();
+      const { data: { session: session2 } } = await supabase2.auth.getSession();
+      const token2 = session2?.access_token ?? "";
       const res = await fetch(`/api/courses/${courseId}/exam/grade`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token2}` },
         body: JSON.stringify({ questions, answers }),
       });
       const data = await res.json();
@@ -86,9 +90,12 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
   const generateExam = async () => {
     setPhase("loading");
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
       const res = await fetch(`/api/courses/${courseId}/exam`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ duration }),
       });
       const data = await res.json();
