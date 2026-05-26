@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { generateCourseAnalysis, generateFlashcards, generateQuiz } from "@/lib/groq/client";
+import { getAuthenticatedUser } from "@/lib/supabase/api";
 
-export const maxDuration = 60; // Vercel function timeout (seconds)
+export const maxDuration = 60;
 
-/**
- * POST /api/courses
- * Accepts multipart/form-data with: title, subject, pdf (optional)
- * 1. Uploads the PDF to Supabase Storage
- * 2. Inserts the course record
- * 3. Runs Groq AI analysis (summary, glossary, flashcards, quiz)
- * 4. Updates the course record with generated content
- */
 export async function POST(req: NextRequest) {
-  const supabase = createClient();
-
-  // Auth check
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  const { user, supabase, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !supabase) {
+    return NextResponse.json({ error: authError ?? "Non authentifié" }, { status: 401 });
   }
 
   try {
@@ -125,10 +114,9 @@ export async function POST(req: NextRequest) {
  * GET /api/courses
  * Returns the authenticated user's courses list.
  */
-export async function GET() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+export async function GET(req: NextRequest) {
+  const { user, supabase, error: authError } = await getAuthenticatedUser(req);
+  if (!user || !supabase) return NextResponse.json({ error: authError ?? "Non authentifié" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("courses")
