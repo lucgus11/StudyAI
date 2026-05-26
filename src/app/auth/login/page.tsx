@@ -2,7 +2,8 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { Loader2, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react";
 
@@ -34,31 +35,28 @@ function LoginMessages() {
 }
 
 function LoginForm() {
+  const router = useRouter();
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      // Login via API route serveur → cookies posés côté serveur via Set-Cookie
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-        credentials: "include", // inclure les cookies dans la réponse
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error ?? "Erreur de connexion");
+      if (error) throw error;
+      if (!data.session) throw new Error("Session non créée");
 
       toast.success("Connexion réussie !");
 
-      // Les cookies sont maintenant dans le navigateur via Set-Cookie de la response.
-      // Navigation directe vers le dashboard.
-      window.location.href = "/dashboard";
+      // Next.js router.push - le DashboardAuthGuard lira getSession()
+      // depuis la mémoire du SDK JS (pas les cookies serveur)
+      router.push("/dashboard");
 
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion");
