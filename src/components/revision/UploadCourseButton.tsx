@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Upload, Loader2, Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
-export default function UploadCourseButton() {
-  const router = useRouter();
+interface Props { onSuccess?: () => void; }
+
+export default function UploadCourseButton({ onSuccess }: Props = {}) {
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -78,7 +78,7 @@ export default function UploadCourseButton() {
       setOpen(false);
       setForm({ title: "", subject: "" });
       setFile(null);
-      router.refresh();
+      if (onSuccess) onSuccess(); else window.location.reload();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur lors du traitement");
     } finally {
