@@ -1,24 +1,17 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import DashboardNav from "@/components/ui/DashboardNav";
+import DashboardAuthGuard from "@/components/ui/DashboardAuthGuard";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) redirect("/auth/login");
-
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen bg-surface-950 overflow-hidden">
-      {/* Sidebar */}
-      <DashboardNav user={user} />
-
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="min-h-full p-4 md:p-8 bg-mesh">
-          {children}
-        </div>
-      </main>
-    </div>
+    <DashboardAuthGuard>
+      <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "#020617" }}>
+        <DashboardNav />
+        <main className="flex-1 overflow-y-auto">
+          <div className="min-h-full p-4 md:p-8 bg-mesh">
+            {children}
+          </div>
+        </main>
+      </div>
+    </DashboardAuthGuard>
   );
 }
