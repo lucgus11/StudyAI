@@ -1,19 +1,14 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+// Middleware minimal - aucune vérification d'auth
+// La protection des routes est gérée par DashboardAuthGuard (client component)
+// qui utilise getSession() depuis le SDK Supabase JS (mémoire locale)
+export function middleware(request: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static, _next/image (Next.js internals)
-     * - favicon, icons, manifest, service worker
-     * - static files (.svg, .png, etc.)
-     * - /auth/confirm (Supabase email callback — handled by route handler directly)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|workbox-.*.js|auth/confirm|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|workbox-.*.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
