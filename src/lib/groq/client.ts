@@ -64,8 +64,9 @@ export interface CourseAnalysis {
 }
 
 export async function generateCourseAnalysis(extractedText: string): Promise<CourseAnalysis> {
-  const system = `Tu es un tuteur expert en pédagogie. Tu analyses des cours universitaires
-et tu produis des ressources d'apprentissage structurées, claires et précises.
+  const system = `Tu es un tuteur expert en matière universitaire. Tu analyses le contenu 
+d'un cours et tu produis des ressources d'apprentissage sur CE COURS SPÉCIFIQUE.
+Tu te concentres sur le contenu académique fourni, jamais sur la pédagogie en général.
 Réponds UNIQUEMENT en JSON valide, sans balises markdown.`;
 
   const user = `Voici le contenu extrait d'un cours :
@@ -94,8 +95,9 @@ Les key_concepts doivent contenir 6 à 12 éléments essentiels.`;
 // ---------------------------------------------------------------------------
 
 export async function generateFlashcards(extractedText: string, count = 20): Promise<Flashcard[]> {
-  const system = `Tu es un expert en apprentissage actif et en mémorisation par répétition espacée.
-Tu crées des flashcards pédagogiques efficaces.
+  const system = `Tu es un expert en apprentissage actif. Tu crées des flashcards 
+sur le contenu académique fourni. Les flashcards portent UNIQUEMENT sur les concepts, 
+définitions et notions du cours fourni, pas sur la pédagogie en général.
 Réponds UNIQUEMENT en JSON valide (tableau), sans balises markdown.`;
 
   const user = `Voici le contenu d'un cours :
@@ -125,8 +127,8 @@ Varie les types (définitions, exemples, applications, comparaisons).`;
 // ---------------------------------------------------------------------------
 
 export async function generateQuiz(extractedText: string, count = 10): Promise<QuizQuestion[]> {
-  const system = `Tu es un enseignant expert qui crée des évaluations formatives.
-Tu génères des QCM et questions Vrai/Faux pédagogiques.
+  const system = `Tu es un enseignant expert. Tu crées des questions d'évaluation 
+basées STRICTEMENT sur le contenu du cours fourni.
 Réponds UNIQUEMENT en JSON valide (tableau), sans balises markdown.`;
 
   const user = `Voici le contenu d'un cours :
