@@ -1,44 +1,26 @@
 /**
  * STUDYAI – Groq AI Client
- *
- * All calls to Groq (Llama-3-70b-8192) are centralised here.
- * Each function is a server-side utility (called from Route Handlers or
- * Server Actions), never exposed to the browser.
+ * Modèle : llama-3.3-70b-versatile
  */
 
 import Groq from "groq-sdk";
 import type {
-  GlossaryTerm,
-  Flashcard,
-  QuizQuestion,
-  ExamQuestion,
-  StudyDay,
-  PlannerFormData,
+  GlossaryTerm, Flashcard, QuizQuestion, ExamQuestion, StudyDay, PlannerFormData,
 } from "@/types";
-
-// ---------------------------------------------------------------------------
-// Client singleton
-// ---------------------------------------------------------------------------
 
 let _groq: Groq | null = null;
 
 function getGroqClient(): Groq {
-  if (!_groq) {
-    _groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
-  }
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
   return _groq;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 async function chat(systemPrompt: string, userMessage: string, maxTokens = 4096): Promise<string> {
   const groq = getGroqClient();
   const completion = await groq.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     max_tokens: maxTokens,
-    temperature: 0.4,
+    temperature: 0.3,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -48,13 +30,38 @@ async function chat(systemPrompt: string, userMessage: string, maxTokens = 4096)
 }
 
 function parseJSON<T>(raw: string): T {
-  // Strip possible markdown code fences
   const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   return JSON.parse(clean) as T;
 }
 
 // ---------------------------------------------------------------------------
-// 1. GRAND ÉCRAN – Summary, Glossary, Key Concepts
+// HELPER : construire le contexte selon si on a du vrai texte ou non
+// ---------------------------------------------------------------------------
+
+function buildContext(extractedText: string, title: string, subject: string): string {
+  const isRealContent = extractedText.length > 200 &&
+    !extractedText.startsWith("MATIÈRE :") &&
+    !extractedText.startsWith("Cours intitulé");
+
+  if (isRealContent) {
+    return extractedText.slice(0, 12000);
+  }
+
+  // Pas de vrai contenu : on demande à l'IA d'utiliser ses connaissances
+  // sur ce sujet académique précis
+  return `[AUCUN PDF FOURNI]
+Utilise tes connaissances académiques sur le sujet suivant :
+- Matière : ${subject}
+- Titre du cours : ${title}
+
+Génère un contenu académique RÉEL et PRÉCIS sur "${title}" en "${subject}",
+comme si tu étais un professeur spécialiste de cette discipline.
+Inclus les concepts fondamentaux, les théories principales et les notions clés
+propres à CE sujet. Ne parle JAMAIS de pédagogie, d'apprentissage ou de méthodes d'enseignement.`;
+}
+
+// ---------------------------------------------------------------------------
+// 1. Résumé, Glossaire, Concepts clés
 // ---------------------------------------------------------------------------
 
 export interface CourseAnalysis {
@@ -63,145 +70,139 @@ export interface CourseAnalysis {
   key_concepts: string[];
 }
 
-export async function generateCourseAnalysis(extractedText: string): Promise<CourseAnalysis> {
-  const system = `Tu es un tuteur expert en matière universitaire. Tu analyses le contenu 
-d'un cours et tu produis des ressources d'apprentissage sur CE COURS SPÉCIFIQUE.
-Tu te concentres sur le contenu académique fourni, jamais sur la pédagogie en général.
+export async function generateCourseAnalysis(
+  extractedText: string,
+  title = "",
+  subject = ""
+): Promise<CourseAnalysis> {
+  const context = buildContext(extractedText, title, subject);
+  const hasPDF = !context.startsWith("[AUCUN PDF FOURNI]");
+
+  const system = `Tu es un professeur universitaire expert en "${subject || "la matière demandée"}".
+Tu dois produire un résumé académique rigoureux sur "${title || subject}".
+RÈGLE ABSOLUE : ton contenu doit porter EXCLUSIVEMENT sur le sujet académique "${title || subject}".
+Ne mentionne JAMAIS la pédagogie, l'apprentissage, les méthodes d'enseignement ou l'évaluation.
 Réponds UNIQUEMENT en JSON valide, sans balises markdown.`;
 
-  const user = `Voici le contenu extrait d'un cours :
+  const user = hasPDF
+    ? `Voici le contenu extrait du cours "${title}" (${subject}) :
 ---
-${extractedText.slice(0, 12000)}
+${context}
 ---
-
-Génère un objet JSON avec exactement cette structure :
+Génère un objet JSON avec cette structure EXACTE :
 {
-  "summary": "Résumé structuré du cours en 4-6 paragraphes HTML (utilise <h3>, <p>, <ul>, <li>)",
-  "glossary": [
-    { "term": "Terme", "definition": "Définition claire et concise" }
-  ],
-  "key_concepts": ["Concept 1", "Concept 2", ...]
+  "summary": "Résumé structuré en HTML (utilise <h3>, <p>, <ul>, <li>, <strong>) sur le CONTENU ACADÉMIQUE du cours",
+  "glossary": [{ "term": "Terme technique du cours", "definition": "Définition précise" }],
+  "key_concepts": ["Concept clé 1", "Concept clé 2", ...]
 }
-
-Le glossaire doit contenir au moins 10 termes importants.
-Les key_concepts doivent contenir 6 à 12 éléments essentiels.`;
+Le résumé doit avoir 4-6 sections avec des <h3> portant sur les THÈMES DU COURS (ex: <h3>Le cycle de l'eau</h3>).
+Le glossaire doit contenir au moins 8 termes techniques du cours.`
+    : `En tant que professeur expert en "${subject}", génère un cours complet sur "${title}".
+Réponds avec ce JSON EXACT :
+{
+  "summary": "Cours académique complet en HTML sur <strong>${title}</strong> avec des <h3> pour chaque grande section du contenu (ex: définitions, théories, exemples concrets, enjeux actuels)",
+  "glossary": [{ "term": "Terme technique propre à ${subject}", "definition": "Définition académique précise" }],
+  "key_concepts": ["Concept fondamental 1", "Concept fondamental 2", ...]
+}
+IMPORTANT : les <h3> doivent parler du CONTENU de "${title}", pas de méthodes d'apprentissage.
+Minimum 8 termes dans le glossaire, minimum 6 concepts clés.`;
 
   const raw = await chat(system, user, 6000);
   return parseJSON<CourseAnalysis>(raw);
 }
 
 // ---------------------------------------------------------------------------
-// 2. MICRO-LEARNING – Flashcards
+// 2. Flashcards
 // ---------------------------------------------------------------------------
 
-export async function generateFlashcards(extractedText: string, count = 20): Promise<Flashcard[]> {
-  const system = `Tu es un expert en apprentissage actif. Tu crées des flashcards 
-sur le contenu académique fourni. Les flashcards portent UNIQUEMENT sur les concepts, 
-définitions et notions du cours fourni, pas sur la pédagogie en général.
+export async function generateFlashcards(
+  extractedText: string,
+  count = 20,
+  title = "",
+  subject = ""
+): Promise<Flashcard[]> {
+  const context = buildContext(extractedText, title, subject);
+  const hasPDF = !context.startsWith("[AUCUN PDF FOURNI]");
+
+  const system = `Tu es un professeur expert en "${subject || "la matière demandée"}".
+Tu crées des flashcards sur le contenu académique de "${title || subject}".
+Chaque flashcard doit tester une notion RÉELLE de ce sujet.
 Réponds UNIQUEMENT en JSON valide (tableau), sans balises markdown.`;
 
-  const user = `Voici le contenu d'un cours :
+  const user = hasPDF
+    ? `Voici le contenu du cours "${title}" (${subject}) :
 ---
-${extractedText.slice(0, 10000)}
+${context.slice(0, 10000)}
 ---
-
-Génère exactement ${count} flashcards au format JSON :
-[
-  {
-    "id": "fc_1",
-    "front": "Question ou terme au recto",
-    "back": "Réponse ou définition au verso",
-    "difficulty": "easy|medium|hard"
-  }
-]
-
-Les flashcards doivent couvrir les notions clés, définitions, formules, et concepts importants.
-Varie les types (définitions, exemples, applications, comparaisons).`;
+Génère exactement ${count} flashcards basées sur CE contenu :
+[{ "id": "fc_1", "front": "Question sur une notion du cours", "back": "Réponse précise", "difficulty": "easy|medium|hard" }]`
+    : `En tant que professeur expert en "${subject}", génère ${count} flashcards sur "${title}".
+Les flashcards doivent couvrir les notions fondamentales de "${title}" en "${subject}".
+Format JSON : [{ "id": "fc_1", "front": "Question académique précise sur ${title}", "back": "Réponse académique précise", "difficulty": "easy|medium|hard" }]
+Les questions doivent porter sur des FAITS, DÉFINITIONS, THÉORIES propres à "${title}".`;
 
   const raw = await chat(system, user, 5000);
   return parseJSON<Flashcard[]>(raw);
 }
 
 // ---------------------------------------------------------------------------
-// 3. MICRO-LEARNING – Quiz (MCQ / True-False)
+// 3. Quiz
 // ---------------------------------------------------------------------------
 
-export async function generateQuiz(extractedText: string, count = 10): Promise<QuizQuestion[]> {
-  const system = `Tu es un enseignant expert. Tu crées des questions d'évaluation 
-basées STRICTEMENT sur le contenu du cours fourni.
+export async function generateQuiz(
+  extractedText: string,
+  count = 10,
+  title = "",
+  subject = ""
+): Promise<QuizQuestion[]> {
+  const context = buildContext(extractedText, title, subject);
+  const hasPDF = !context.startsWith("[AUCUN PDF FOURNI]");
+
+  const system = `Tu es un professeur expert en "${subject || "la matière demandée"}".
+Tu crées des questions d'examen sur "${title || subject}".
+Les questions portent STRICTEMENT sur le contenu académique de ce cours.
 Réponds UNIQUEMENT en JSON valide (tableau), sans balises markdown.`;
 
-  const user = `Voici le contenu d'un cours :
+  const user = hasPDF
+    ? `Contenu du cours "${title}" (${subject}) :
 ---
-${extractedText.slice(0, 10000)}
+${context.slice(0, 10000)}
 ---
-
-Génère ${count} questions au format JSON :
-[
-  {
-    "id": "q_1",
-    "question": "Texte de la question",
-    "type": "mcq",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct_answer": "Option A",
-    "explanation": "Explication courte de la bonne réponse"
-  },
-  {
-    "id": "q_2",
-    "question": "Affirmation à évaluer",
-    "type": "true_false",
-    "options": ["Vrai", "Faux"],
-    "correct_answer": "Vrai",
-    "explanation": "Explication courte"
-  }
-]
-
-Mélange les types : 60% MCQ, 40% Vrai/Faux.
-Assure-toi que les questions couvrent différentes parties du cours.`;
+Génère ${count} questions basées sur CE contenu :
+[{ "id": "q_1", "question": "...", "type": "mcq", "options": ["A","B","C","D"], "correct_answer": "A", "explanation": "..." }]
+Mélange : 60% mcq, 40% true_false.`
+    : `En tant que professeur en "${subject}", génère ${count} questions d'examen sur "${title}".
+Format JSON : [{ "id": "q_1", "question": "Question précise sur ${title}", "type": "mcq|true_false", "options": ["A","B","C","D"], "correct_answer": "...", "explanation": "Explication académique" }]
+Les questions doivent tester des CONNAISSANCES RÉELLES sur "${title}" en "${subject}".`;
 
   const raw = await chat(system, user, 4000);
   return parseJSON<QuizQuestion[]>(raw);
 }
 
 // ---------------------------------------------------------------------------
-// 4. CRASH TEST – Exam blanc
+// 4. Examen blanc
 // ---------------------------------------------------------------------------
 
 export async function generateExam(extractedText: string, durationMinutes = 60): Promise<ExamQuestion[]> {
   const questionsCount = Math.floor(durationMinutes / 6);
-  const system = `Tu es un professeur universitaire expérimenté qui crée des examens équilibrés
-et représentatifs du cours.
+
+  const system = `Tu es un professeur universitaire qui crée des examens rigoureux.
 Réponds UNIQUEMENT en JSON valide (tableau), sans balises markdown.`;
 
-  const user = `Voici le contenu d'un cours :
+  const user = `Contenu du cours :
 ---
 ${extractedText.slice(0, 12000)}
 ---
-
-Génère un examen blanc de ${durationMinutes} minutes avec ${questionsCount} questions.
-Format JSON :
-[
-  {
-    "id": "ex_1",
-    "question": "Texte de la question",
-    "type": "mcq|true_false|open",
-    "options": ["A", "B", "C", "D"],
-    "correct_answer": "Réponse attendue",
-    "points": 2,
-    "explanation": "Correction détaillée"
-  }
-]
-
-Répartition suggérée : 40% MCQ, 20% Vrai/Faux, 40% questions ouvertes.
-Total des points : 20.
-Les questions ouvertes (type "open") n'ont pas de "options".`;
+Génère un examen de ${durationMinutes} minutes avec ${questionsCount} questions :
+[{ "id": "ex_1", "question": "...", "type": "mcq|true_false|open", "options": ["A","B","C","D"], "correct_answer": "...", "points": 2, "explanation": "..." }]
+Répartition : 40% mcq, 20% true_false, 40% open. Total : 20 points.`;
 
   const raw = await chat(system, user, 6000);
   return parseJSON<ExamQuestion[]>(raw);
 }
 
 // ---------------------------------------------------------------------------
-// 5. CRASH TEST – Corrigé et feedback IA
+// 5. Correction examen
 // ---------------------------------------------------------------------------
 
 export interface ExamFeedback {
@@ -216,35 +217,24 @@ export async function gradeExam(
   questions: ExamQuestion[],
   answers: Record<string, string>
 ): Promise<ExamFeedback> {
-  const system = `Tu es un correcteur bienveillant et pédagogue. Tu corriges des examens blancs
-et tu fournis un retour constructif et motivant.
+  const system = `Tu es un correcteur bienveillant. Tu corriges des examens et fournis un retour constructif.
 Réponds UNIQUEMENT en JSON valide, sans balises markdown.`;
 
   const qa = questions.map((q) => ({
-    id: q.id,
-    question: q.question,
-    correct_answer: q.correct_answer,
-    student_answer: answers[q.id] ?? "(sans réponse)",
-    points: q.points,
-    type: q.type,
+    id: q.id, question: q.question, correct_answer: q.correct_answer,
+    student_answer: answers[q.id] ?? "(sans réponse)", points: q.points, type: q.type,
   }));
 
-  const user = `Voici les questions et les réponses de l'étudiant :
+  const user = `Questions et réponses de l'étudiant :
 ${JSON.stringify(qa, null, 2)}
 
-Corrige l'examen et génère un objet JSON :
+Corrige et génère :
 {
-  "score": nombre_points_obtenus,
-  "total": nombre_points_total,
+  "score": points_obtenus,
+  "total": points_total,
   "percentage": pourcentage,
-  "globalFeedback": "Feedback global motivant et constructif (3-4 phrases HTML avec <p>)",
-  "questionFeedbacks": [
-    {
-      "id": "ex_1",
-      "correct": true|false,
-      "feedback": "Explication courte de la correction"
-    }
-  ]
+  "globalFeedback": "<p>Feedback global motivant</p>",
+  "questionFeedbacks": [{ "id": "ex_1", "correct": true|false, "feedback": "Explication courte" }]
 }`;
 
   const raw = await chat(system, user, 3000);
@@ -252,12 +242,11 @@ Corrige l'examen et génère un objet JSON :
 }
 
 // ---------------------------------------------------------------------------
-// 6. PLANIFICATEUR – Calendrier d'étude
+// 6. Planning d'étude
 // ---------------------------------------------------------------------------
 
 export async function generateStudyPlan(data: PlannerFormData): Promise<StudyDay[]> {
-  const system = `Tu es un expert en planification d'études et en optimisation cognitive.
-Tu crées des plans de révision personnalisés, réalistes et efficaces.
+  const system = `Tu es un expert en planification d'études. Tu crées des plans de révision personnalisés.
 Réponds UNIQUEMENT en JSON valide (tableau de jours), sans balises markdown.`;
 
   const examsInfo = data.exams
@@ -265,37 +254,21 @@ Réponds UNIQUEMENT en JSON valide (tableau de jours), sans balises markdown.`;
     .join("\n");
 
   const today = new Date().toISOString().split("T")[0];
+
   const user = `Contexte :
 - Date du jour : ${today}
-- Examens à venir :
-${examsInfo}
-- Semaines de révision disponibles : ${data.weeksBeforeStart}
-- Heures par jour : ${data.dailyHours}
+- Examens : ${examsInfo}
+- Semaines disponibles : ${data.weeksBeforeStart}
+- Heures/jour : ${data.dailyHours}
 - Jours de repos : ${data.restDays.join(", ")}
 
-Génère un planning de révision complet du ${today} jusqu'à l'avant-veille du premier examen.
-Format JSON (tableau de jours) :
-[
-  {
-    "date": "YYYY-MM-DD",
-    "isRestDay": false,
-    "sessions": [
-      {
-        "subject": "Matière",
-        "duration": 90,
-        "topics": ["Thème 1", "Thème 2"],
-        "priority": "high|medium|low"
-      }
-    ]
-  }
-]
-
-Règles :
-- Les jours de repos ont "isRestDay": true et "sessions": []
-- Alloue plus de temps aux matières à haute importance et dont l'examen est proche
-- Évite de réviser la même matière plus de 3h d'affilée
-- Intègre des révisions espacées (revoir une matière 2-3 fois à intervalles croissants)
-- Respecte strictement les heures quotidiennes (${data.dailyHours}h max par jour actif)`;
+Génère le planning du ${today} jusqu'à l'avant-veille du premier examen :
+[{
+  "date": "YYYY-MM-DD",
+  "isRestDay": false,
+  "sessions": [{ "subject": "Matière", "duration": 90, "topics": ["Thème 1"], "priority": "high|medium|low" }]
+}]
+Règles : repos = sessions vides, max ${data.dailyHours}h/jour actif, révisions espacées.`;
 
   const raw = await chat(system, user, 8192);
   return parseJSON<StudyDay[]>(raw);
