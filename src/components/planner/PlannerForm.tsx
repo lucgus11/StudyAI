@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -19,10 +18,10 @@ const DAY_OPTIONS = [
 
 interface Props {
   existingPlan?: StudyPlan | null;
+  onSuccess?: () => void;
 }
 
-export default function PlannerForm({ existingPlan }: Props) {
-  const router = useRouter();
+export default function PlannerForm({ existingPlan, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [weeksBeforeStart, setWeeksBeforeStart] = useState(
     existingPlan?.weeks_count ?? 4
@@ -80,7 +79,7 @@ export default function PlannerForm({ existingPlan }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success("Planning généré avec succès !");
-      router.refresh();
+      if (onSuccess) onSuccess();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de la génération");
     } finally {
