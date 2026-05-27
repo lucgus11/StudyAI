@@ -63,9 +63,9 @@ traite directement du contenu académique de "${title}" en "${subject}".`;
 
     // 4. Run AI analysis in parallel
     const [analysis, flashcards, quizQuestions] = await Promise.all([
-      generateCourseAnalysis(extractedText),
-      generateFlashcards(extractedText, 20),
-      generateQuiz(extractedText, 10),
+      generateCourseAnalysis(extractedText, title, subject),
+      generateFlashcards(extractedText, 20, title, subject),
+      generateQuiz(extractedText, 10, title, subject),
     ]);
 
     // 5. Update course record with AI content
