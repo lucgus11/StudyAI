@@ -30,8 +30,28 @@ async function chat(systemPrompt: string, userMessage: string, maxTokens = 4096)
 }
 
 function parseJSON<T>(raw: string): T {
-  const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(clean) as T;
+  // Supprimer les balises markdown
+  let clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+  // Extraire uniquement le bloc JSON entre { } ou [ ]
+  const jsonStart = clean.search(/[{[]/);
+  const jsonEnd = Math.max(clean.lastIndexOf("}"), clean.lastIndexOf("]"));
+  if (jsonStart !== -1 && jsonEnd !== -1) {
+    clean = clean.slice(jsonStart, jsonEnd + 1);
+  }
+
+  // Nettoyer les caractères de contrôle invalides
+  clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ");
+
+  try {
+    return JSON.parse(clean) as T;
+  } catch {
+    // Réparer les sauts de ligne non échappés dans les strings JSON
+    const repaired = clean.replace(/("(?:[^"\\]|\\.)*")/g, (match) =>
+      match.replace(/\n/g, "\\n").replace(/\t/g, "\\t").replace(/\r/g, "")
+    );
+    return JSON.parse(repaired) as T;
+  }
 }
 
 // ---------------------------------------------------------------------------
