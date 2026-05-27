@@ -1,61 +1,53 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookOpen, Calendar, Zap, Trophy, ArrowRight, Plus } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-export default async function DashboardPage() {
+interface Course { id: string; title: string; subject: string; created_at: string; }
+interface Score { score: number; total: number; created_at: string; }
+
+export default function DashboardPage() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [scores, setScores] = useState<Score[]>([]);
   const supabase = createClient();
 
-  // Ne pas appeler getUser() - récupérer uniquement les données nécessaires
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, title, subject, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5);
+  useEffect(() => {
+    supabase.from("courses").select("id, title, subject, created_at")
+      .order("created_at", { ascending: false }).limit(5)
+      .then(({ data }) => setCourses((data as Course[]) ?? []));
 
-  const { data: scores } = await supabase
-    .from("quiz_scores")
-    .select("score, total, mode, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5);
+    supabase.from("quiz_scores").select("score, total, created_at")
+      .order("created_at", { ascending: false }).limit(5)
+      .then(({ data }) => setScores((data as Score[]) ?? []));
+  }, []);
 
-  const totalCourses = courses?.length ?? 0;
-  const avgScore =
-    scores && scores.length > 0
-      ? Math.round(scores.reduce((a, s) => a + (s.score / s.total) * 100, 0) / scores.length)
-      : null;
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((a, s) => a + (s.score / s.total) * 100, 0) / scores.length)
+    : null;
+
+  const today = new Date().toISOString().split("T")[0];
+  const todaySessions = scores.filter(s => s.created_at?.startsWith(today)).length;
 
   const quickActions = [
-    {
-      href: "/dashboard/courses",
-      label: "Ajouter un cours",
-      description: "Téléverse un PDF et génère tes ressources",
-      icon: Plus,
-      color: "from-brand-600 to-brand-700",
-    },
-    {
-      href: "/dashboard/planner",
-      label: "Planifier mes révisions",
-      description: "Génère un calendrier personnalisé avec l'IA",
-      icon: Calendar,
-      color: "from-accent-600 to-accent-700",
-    },
+    { href: "/dashboard/courses", label: "Ajouter un cours", description: "Téléverse un PDF et génère tes ressources", icon: Plus, from: "#4f46e5", to: "#4338ca" },
+    { href: "/dashboard/planner", label: "Planifier mes révisions", description: "Génère un calendrier personnalisé avec l'IA", icon: Calendar, from: "#059669", to: "#047857" },
   ];
 
   return (
     <div className="space-y-8 pb-20 md:pb-0 animate-fade-in">
       <div>
-        <h1 className="font-display text-3xl font-bold text-slate-50">
-          Bonjour 👋
-        </h1>
+        <h1 className="font-display text-3xl font-bold text-slate-50">Bonjour 👋</h1>
         <p className="text-slate-400 mt-1">Prêt pour ta session de révision ?</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Cours chargés", value: totalCourses, icon: BookOpen, color: "text-indigo-400" },
+          { label: "Cours chargés", value: courses.length, icon: BookOpen, color: "text-indigo-400" },
           { label: "Score moyen", value: avgScore !== null ? `${avgScore}%` : "—", icon: Trophy, color: "text-amber-400" },
-          { label: "Sessions aujourd'hui", value: scores?.filter(s => s.created_at?.startsWith(new Date().toISOString().split("T")[0])).length ?? 0, icon: Zap, color: "text-emerald-400" },
-          { label: "Quiz complétés", value: scores?.length ?? 0, icon: Calendar, color: "text-indigo-300" },
+          { label: "Sessions aujourd'hui", value: todaySessions, icon: Zap, color: "text-emerald-400" },
+          { label: "Quiz complétés", value: scores.length, icon: Calendar, color: "text-indigo-300" },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
@@ -75,7 +67,8 @@ export default async function DashboardPage() {
             const Icon = action.icon;
             return (
               <Link key={action.href} href={action.href} className="card-hover group flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center flex-shrink-0`}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${action.from}, ${action.to})` }}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -89,13 +82,11 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {courses && courses.length > 0 && (
+      {courses.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-lg font-semibold text-slate-200">Cours récents</h2>
-            <Link href="/dashboard/courses" className="text-sm" style={{ color: "#818cf8" }}>
-              Voir tout →
-            </Link>
+            <Link href="/dashboard/courses" className="text-sm" style={{ color: "#818cf8" }}>Voir tout →</Link>
           </div>
           <div className="space-y-2">
             {courses.map((course) => (
