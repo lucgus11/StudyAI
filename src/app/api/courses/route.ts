@@ -46,11 +46,19 @@ export async function POST(req: NextRequest) {
         const arrayBuffer = await pdfResponse.arrayBuffer();
         extractedText = await extractTextFromPDF(arrayBuffer);
       } catch {
-        extractedText = `Cours intitulé "${title}" sur la matière "${subject}".`;
+        extractedText = `MATIÈRE : ${subject}\nTITRE DU COURS : ${title}\n\nGénère un contenu académique complet sur "${title}" en "${subject}". Ne parle pas de pédagogie en général.`;
       }
     } else {
-      extractedText = `Cours intitulé "${title}" sur la matière "${subject}". 
-      Génère des ressources pédagogiques complètes sur ce sujet.`;
+      // Pas de PDF : on construit un prompt clair pour que l'IA génère
+      // du contenu sur la VRAIE matière, pas sur "la pédagogie"
+      extractedText = `MATIÈRE : ${subject}
+TITRE DU COURS : ${title}
+
+Ce cours porte sur "${title}" dans la discipline "${subject}".
+Génère un résumé détaillé, un glossaire et des ressources d'apprentissage
+sur le contenu réel et typique de ce cours universitaire.
+Ne parle PAS de pédagogie ou d'apprentissage en général — 
+traite directement du contenu académique de "${title}" en "${subject}".`;
     }
 
     // 4. Run AI analysis in parallel
