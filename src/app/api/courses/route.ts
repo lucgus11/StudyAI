@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, subject, pdfPath = null, pdfUrl = null } = body;
+    const { title, subject, pdfPath = null, pdfUrl = null, extractedText: clientText = "" } = body;
 
     if (!title || !subject) {
       return NextResponse.json({ error: "Titre et matiere requis" }, { status: 400 });
@@ -60,18 +60,13 @@ export async function POST(req: NextRequest) {
 
     if (insertError) throw new Error("Erreur BDD: " + insertError.message);
 
-    // 2. Extraire le texte du PDF
+    // 2. Utiliser le texte extrait cote client (fiable) ou le fallback
     let extractedText = "";
-    if (pdfUrl) {
-      try {
-        const pdfResponse = await fetch(pdfUrl);
-        const arrayBuffer = await pdfResponse.arrayBuffer();
-        const rawText = await extractTextFromPDF(arrayBuffer);
-        extractedText = sanitizeText(rawText);
-      } catch {
-        extractedText = buildFallbackContext(title, subject);
-      }
+    if (clientText && clientText.length > 100) {
+      // Texte extrait par PDF.js dans le navigateur - le plus precis
+      extractedText = sanitizeText(clientText);
     } else {
+      // Pas de PDF ou extraction echouee : fallback sur les connaissances de l'IA
       extractedText = buildFallbackContext(title, subject);
     }
 
