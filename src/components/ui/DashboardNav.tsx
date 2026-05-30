@@ -7,7 +7,7 @@ import { useOnlineStatus } from "@/hooks";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, BookOpen, Calendar, WifiOff,
-  LogOut, Download, Zap,
+  LogOut, Download, Zap, ClipboardList,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/dashboard", label: "Accueil", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/courses", label: "Mes cours", icon: BookOpen },
   { href: "/dashboard/planner", label: "Planificateur", icon: Calendar },
+  { href: "/dashboard/sheets", label: "Fiches", icon: ClipboardList },
   { href: "/dashboard/offline", label: "Hors-ligne", icon: Download },
 ];
 
