@@ -163,3 +163,48 @@ export interface ToastMessage {
   type: "success" | "error" | "info" | "warning";
   message: string;
 }
+
+
+// ---- Revision Sheets ----
+
+export type BlockType =
+  | "heading1"
+  | "heading2"
+  | "text"
+  | "definition"
+  | "keypoint"
+  | "table"
+  | "timeline"
+  | "formula"
+  | "divider";
+
+export interface Block {
+  id: string;
+  type: BlockType;
+  content: string;       // Texte principal
+  subtitle?: string;     // Pour definition: le terme; pour table: headers JSON
+  color?: string;        // Couleur d'accent du bloc
+  rows?: string[][];     // Pour les tableaux
+  items?: { date: string; event: string }[]; // Pour timeline
+}
+
+export interface Sheet {
+  id: string;
+  user_id: string;
+  course_id: string | null;
+  title: string;
+  color: string;         // Couleur de la fiche (#fde68a, #bbf7d0, #bfdbfe, etc.)
+  blocks: Block[];
+  created_at: string;
+  updated_at: string;
+}
+
+export const SHEET_COLORS = [
+  { value: "#fde68a", label: "Jaune" },
+  { value: "#bbf7d0", label: "Vert" },
+  { value: "#bfdbfe", label: "Bleu" },
+  { value: "#fecaca", label: "Rose" },
+  { value: "#e9d5ff", label: "Violet" },
+  { value: "#fed7aa", label: "Orange" },
+  { value: "#f1f5f9", label: "Blanc" },
+];
