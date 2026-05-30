@@ -6,7 +6,7 @@ import {
   Clock, Divide, Plus, Trash2, GripVertical,
   ChevronUp, ChevronDown, Sigma
 } from "lucide-react";
-import type { Block, BlockType, Sheet, SHEET_COLORS } from "@/types";
+import type { Block, BlockType, Sheet } from "@/types";
 import { SHEET_COLORS as COLORS } from "@/types";
 import { clsx } from "clsx";
 
