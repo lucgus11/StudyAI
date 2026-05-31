@@ -1,6 +1,11 @@
 import DashboardNav from "@/components/ui/DashboardNav";
 import DashboardAuthGuard from "@/components/ui/DashboardAuthGuard";
 
+// Forcer le rendu dynamique — empêche Next.js de pré-rendre
+// statiquement les pages dashboard (qui nécessitent une session auth)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <DashboardAuthGuard>
