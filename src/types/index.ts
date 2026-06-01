@@ -192,8 +192,9 @@ export interface Sheet {
   id: string;
   user_id: string;
   course_id: string | null;
+  folder_id: string | null;
   title: string;
-  color: string;         // Couleur de la fiche (#fde68a, #bbf7d0, #bfdbfe, etc.)
+  color: string;
   blocks: Block[];
   created_at: string;
   updated_at: string;
@@ -208,3 +209,16 @@ export const SHEET_COLORS = [
   { value: "#fed7aa", label: "Orange" },
   { value: "#f1f5f9", label: "Blanc" },
 ];
+
+// ---- Folders ----
+
+export interface Folder {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  name: string;
+  created_at: string;
+  // Propriétés calculées côté client
+  children?: Folder[];
+  sheetCount?: number;
+}
