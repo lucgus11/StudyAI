@@ -12,6 +12,7 @@ Une application web progressive (PWA) complète et clé en main pour aider les �
 | **Mode Grand Écran** | Résumé structuré, glossaire et concepts clés générés par IA à partir de tes PDFs |
 | **Mode Micro-Learning** | Flashcards interactives (flip) + mini-quiz QCM/Vrai-Faux pour sessions courtes |
 | **Mode Crash Test** | Examen blanc chronométré avec correction et feedback détaillé par l'IA |
+| **Création de fiches** | Fiches totalement personnalisable et téléchargable|
 | **Mode Hors-ligne** | Télécharge tes cours dans IndexedDB, révise sans connexion, sync automatique des scores |
 | **PWA Installable** | Icônes, manifest, Service Workers — installable sur iOS et Android |
 
