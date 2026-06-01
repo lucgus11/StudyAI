@@ -13,6 +13,7 @@ const emptySheet = (): Sheet => ({
   id: "",
   user_id: "",
   course_id: null,
+  folder_id: null,
   title: "Ma fiche de révision",
   color: "#fde68a",
   blocks: [],
