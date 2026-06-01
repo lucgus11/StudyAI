@@ -54,6 +54,7 @@ export default function EditSheetPage() {
           title: sheet.title,
           color: sheet.color,
           blocks: sheet.blocks,
+          folder_id: sheet.folder_id ?? null,
         }),
       });
 
