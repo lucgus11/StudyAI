@@ -3,24 +3,19 @@ const withPWA = require("next-pwa")({
   dest: "public",
   register: true,
   skipWaiting: true,
-  // Réactivé avec une config soigneuse pour éviter les problèmes de cache
   disable: process.env.NODE_ENV === "development",
   publicExcludes: ["!icons/**/*"],
   buildExcludes: [/middleware-manifest\.json$/],
-  fallbackRoutes: { document: "/offline" },
+  fallbacks: { document: "/offline" },
   runtimeCaching: [
-    // ---- AUTH & API : jamais de cache ----
     {
       urlPattern: /^https?:\/\/.*\/(auth|api)\/.*/i,
       handler: "NetworkOnly",
     },
-    // ---- Supabase Auth API : jamais de cache ----
     {
       urlPattern: /^https?:\/\/.*\.supabase\.co\/auth\/.*/i,
       handler: "NetworkOnly",
     },
-    // ---- Pages dashboard : NetworkFirst (réseau prioritaire, cache fallback) ----
-    // Timeout 8s puis sert le cache — accès offline si réseau absent
     {
       urlPattern: /^https?:\/\/[^/]*\/dashboard(\/.*)?$/i,
       handler: "NetworkFirst",
@@ -29,19 +24,15 @@ const withPWA = require("next-pwa")({
         networkTimeoutSeconds: 8,
         expiration: {
           maxEntries: 50,
-          maxAgeSeconds: 60 * 60 * 24 * 7, // 7 jours
+          maxAgeSeconds: 60 * 60 * 24 * 7,
         },
-        cacheableResponse: {
-          statuses: [0, 200],
-        },
+        cacheableResponse: { statuses: [0, 200] },
       },
     },
-    // ---- Pages auth : NetworkOnly (ne jamais servir en cache) ----
     {
-      urlPattern: /^https?:\/\/[^/]*\/(auth)(\/.*)?$/i,
+      urlPattern: /^https?:\/\/[^/]*\/auth(\/.*)?$/i,
       handler: "NetworkOnly",
     },
-    // ---- PDFs Supabase Storage : CacheFirst ----
     {
       urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
       handler: "CacheFirst",
@@ -49,12 +40,11 @@ const withPWA = require("next-pwa")({
         cacheName: "studyai-pdfs",
         expiration: {
           maxEntries: 30,
-          maxAgeSeconds: 60 * 60 * 24 * 30, // 30 jours
+          maxAgeSeconds: 60 * 60 * 24 * 30,
         },
         cacheableResponse: { statuses: [0, 200] },
       },
     },
-    // ---- Fonts Google : CacheFirst (immuables) ----
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
       handler: "CacheFirst",
@@ -64,7 +54,6 @@ const withPWA = require("next-pwa")({
         cacheableResponse: { statuses: [0, 200] },
       },
     },
-    // ---- JS / CSS Next.js (_next/static) : CacheFirst (versionnés) ----
     {
       urlPattern: /\/_next\/static\/.*/i,
       handler: "CacheFirst",
@@ -76,7 +65,6 @@ const withPWA = require("next-pwa")({
         },
       },
     },
-    // ---- Images/_next/image : StaleWhileRevalidate ----
     {
       urlPattern: /\/_next\/image\?.*/i,
       handler: "StaleWhileRevalidate",
@@ -88,7 +76,6 @@ const withPWA = require("next-pwa")({
         },
       },
     },
-    // ---- Icônes et assets statiques ----
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico|webp)$/i,
       handler: "StaleWhileRevalidate",
