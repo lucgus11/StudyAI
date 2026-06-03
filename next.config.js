@@ -6,7 +6,6 @@ const withPWA = require("next-pwa")({
   disable: process.env.NODE_ENV === "development",
   publicExcludes: ["!icons/**/*"],
   buildExcludes: [/middleware-manifest\.json$/],
-  fallbacks: { document: "/offline" },
   runtimeCaching: [
     {
       urlPattern: /^https?:\/\/.*\/(auth|api)\/.*/i,
