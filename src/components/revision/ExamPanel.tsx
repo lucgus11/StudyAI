@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Timer, Play, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { clsx } from "clsx";
-import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import { createClient } from "@/lib/supabase/client";
 import type { ExamQuestion } from "@/types";
 
 interface Props {
@@ -35,20 +35,35 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [results, setResults] = useState<Results | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // submitExam declared BEFORE useEffect that references it
+  // Refs pour éviter les closures stales
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const questionsRef = useRef<ExamQuestion[]>([]);
+  const answersRef = useRef<Record<string, string>>({});
+  const phaseRef = useRef<Phase>("setup");
+
+  questionsRef.current = questions;
+  answersRef.current = answers;
+  phaseRef.current = phase;
+
   const submitExam = useCallback(async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setPhase("submitting");
     try {
-      const supabase2 = createClient();
-      const { data: { session: session2 } } = await supabase2.auth.getSession();
-      const token2 = session2?.access_token ?? "";
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+
       const res = await fetch(`/api/courses/${courseId}/exam/grade`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token2}` },
-        body: JSON.stringify({ questions, answers }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token,
+        },
+        body: JSON.stringify({
+          questions: questionsRef.current,
+          answers: answersRef.current,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -58,44 +73,52 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de la correction");
       setPhase("running");
     }
-  }, [courseId, questions, answers]);
+  }, [courseId]);
 
-  // Timer countdown — submitExam is now in scope
+  // Démarrer le timer UNE SEULE FOIS quand phase passe à "running"
+  // On utilise un ref pour la durée initiale afin de ne pas re-déclencher l'effet
+  const durationRef = useRef(duration);
+
   useEffect(() => {
     if (phase !== "running") return;
-    setTimeLeft(duration * 60);
+
+    // Initialiser le temps au démarrage
+    const totalSeconds = durationRef.current * 60;
+    setTimeLeft(totalSeconds);
+
+    // Lancer le countdown
     timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
           clearInterval(timerRef.current!);
-          // Use a ref-based approach to avoid stale closure
+          // Déclencher la soumission via timeout pour éviter setState imbriqués
+          setTimeout(() => submitExam(), 0);
           return 0;
         }
-        return t - 1;
+        return prev - 1;
       });
     }, 1000);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, duration]);
-
-  // Separate effect to trigger submit when time hits 0
-  useEffect(() => {
-    if (phase === "running" && timeLeft === 0 && questions.length > 0) {
-      submitExam();
-    }
-  }, [timeLeft, phase, questions.length, submitExam]);
+  }, [phase]); // Uniquement quand phase change → "running"
 
   const generateExam = async () => {
+    durationRef.current = duration; // Sauvegarder la durée choisie
     setPhase("loading");
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token ?? "";
+
       const res = await fetch(`/api/courses/${courseId}/exam`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token,
+        },
         body: JSON.stringify({ duration }),
       });
       const data = await res.json();
@@ -115,25 +138,22 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
     return `${m}:${s}`;
   };
 
-  const timeRatio = questions.length > 0 ? timeLeft / (duration * 60) : 1;
+  const totalSeconds = durationRef.current * 60;
+  const timeRatio = totalSeconds > 0 ? timeLeft / totalSeconds : 1;
   const timerColor =
-    timeRatio > 0.5
-      ? "text-accent-400"
-      : timeRatio > 0.2
-      ? "text-warn-400"
-      : "text-danger-400";
+    timeRatio > 0.5 ? "text-emerald-400" :
+    timeRatio > 0.2 ? "text-amber-400" :
+    "text-red-400";
 
-  // ---- SETUP PHASE ----
+  // ---- SETUP ----
   if (phase === "setup") {
     return (
       <div className="card max-w-md mx-auto space-y-6">
         <div className="text-center">
           <div className="text-4xl mb-3">🎯</div>
-          <h2 className="font-display text-xl font-bold text-slate-50">
-            Prêt pour le Crash Test ?
-          </h2>
+          <h2 className="font-display text-xl font-bold text-slate-50">Prêt pour le Crash Test ?</h2>
           <p className="text-slate-400 text-sm mt-1">
-            L&apos;IA va générer un examen blanc basé sur{" "}
+            L&apos;IA génère un examen blanc basé sur{" "}
             <strong className="text-slate-300">{courseTitle}</strong>.
           </p>
         </div>
@@ -148,9 +168,10 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
                 className={clsx(
                   "py-3 rounded-xl border text-sm font-semibold transition-all",
                   duration === d
-                    ? "border-brand-500 bg-brand-900/30 text-brand-300"
+                    ? "border-indigo-500 text-indigo-300"
                     : "border-surface-700 text-slate-400 hover:border-surface-600"
                 )}
+                style={duration === d ? { backgroundColor: "rgba(99,102,241,0.2)" } : {}}
               >
                 {d} min
               </button>
@@ -158,17 +179,17 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
           </div>
         </div>
 
-        <div className="bg-surface-800 rounded-xl p-4 space-y-2">
+        <div className="rounded-xl p-4 space-y-2" style={{ backgroundColor: "#1e293b" }}>
           <p className="text-sm font-medium text-slate-300">Ce qui vous attend :</p>
           <ul className="space-y-1.5">
             {[
               `~${Math.floor(duration / 6)} questions générées par l'IA`,
               "Mélange de QCM, Vrai/Faux et questions ouvertes",
-              "Chronomètre automatique",
+              `Chronomètre de ${duration} minutes`,
               "Correction détaillée et score final",
             ].map((item) => (
               <li key={item} className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
                 {item}
               </li>
             ))}
@@ -183,33 +204,29 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
     );
   }
 
-  // ---- LOADING PHASE ----
+  // ---- LOADING ----
   if (phase === "loading") {
     return (
       <div className="card flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-brand-400 animate-spin" />
-        <p className="font-display text-lg font-semibold text-slate-200">
-          L&apos;IA prépare ton examen…
-        </p>
-        <p className="text-slate-400 text-sm">Génération des questions en cours (30s max)</p>
+        <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
+        <p className="font-display text-lg font-semibold text-slate-200">L&apos;IA prépare ton examen…</p>
+        <p className="text-slate-400 text-sm">Génération des questions (30s max)</p>
       </div>
     );
   }
 
-  // ---- SUBMITTING PHASE ----
+  // ---- SUBMITTING ----
   if (phase === "submitting") {
     return (
       <div className="card flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-accent-400 animate-spin" />
-        <p className="font-display text-lg font-semibold text-slate-200">
-          Correction en cours…
-        </p>
+        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+        <p className="font-display text-lg font-semibold text-slate-200">Correction en cours…</p>
         <p className="text-slate-400 text-sm">L&apos;IA analyse tes réponses</p>
       </div>
     );
   }
 
-  // ---- RESULTS PHASE ----
+  // ---- RESULTS ----
   if (phase === "results" && results) {
     return (
       <div className="space-y-6">
@@ -221,14 +238,14 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
             {results.score}/{results.total}
           </p>
           <p className="text-slate-400 mt-1">{results.percentage}% de réussite</p>
+
           <div
-            className="mt-5 text-sm text-slate-300 text-left bg-surface-800 rounded-xl p-4 border border-surface-700"
+            className="mt-5 text-sm text-slate-300 text-left rounded-xl p-4 border border-surface-700"
+            style={{ backgroundColor: "#1e293b" }}
             dangerouslySetInnerHTML={{ __html: results.globalFeedback }}
           />
-          <button
-            onClick={() => setPhase("setup")}
-            className="btn-secondary mt-6 mx-auto gap-2"
-          >
+
+          <button onClick={() => setPhase("setup")} className="btn-secondary mt-6 gap-2">
             Refaire un examen
           </button>
         </div>
@@ -238,37 +255,29 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
           {questions.map((q) => {
             const fb = results.questionFeedbacks.find((f) => f.id === q.id);
             return (
-              <div
-                key={q.id}
+              <div key={q.id}
                 className={clsx(
                   "p-4 rounded-xl border space-y-2",
                   fb?.correct
-                    ? "bg-accent-900/10 border-accent-700/30"
-                    : "bg-danger-900/10 border-danger-700/30"
-                )}
-              >
+                    ? "bg-emerald-900/10 border-emerald-700/30"
+                    : "bg-red-900/10 border-red-700/30"
+                )}>
                 <div className="flex items-start gap-2">
-                  {fb?.correct ? (
-                    <CheckCircle className="w-4 h-4 text-accent-400 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
-                  )}
+                  {fb?.correct
+                    ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
                   <p className="text-sm font-medium text-slate-100 flex-1">{q.question}</p>
-                  <span className="text-xs text-slate-500 flex-shrink-0">
-                    {q.points} pt{q.points > 1 ? "s" : ""}
-                  </span>
+                  <span className="text-xs text-slate-500 flex-shrink-0">{q.points}pt</span>
                 </div>
                 <div className="pl-6 space-y-1">
                   {answers[q.id] && (
                     <p className="text-xs text-slate-400">
-                      <span className="text-slate-500">Ta réponse : </span>
-                      {answers[q.id]}
+                      <span className="text-slate-500">Ta réponse : </span>{answers[q.id]}
                     </p>
                   )}
                   {!fb?.correct && (
-                    <p className="text-xs text-accent-400">
-                      <span className="text-slate-500">Bonne réponse : </span>
-                      {q.correct_answer}
+                    <p className="text-xs text-emerald-400">
+                      <span className="text-slate-500">Bonne réponse : </span>{q.correct_answer}
                     </p>
                   )}
                   {fb?.feedback && (
@@ -283,23 +292,22 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
     );
   }
 
-  // ---- RUNNING PHASE ----
+  // ---- RUNNING ----
   return (
     <div className="space-y-4">
-      {/* Timer bar */}
+      {/* Timer */}
       <div className="card flex items-center gap-4 py-3">
         <Timer className={clsx("w-5 h-5 flex-shrink-0", timerColor)} />
-        <div className="flex-1 bg-surface-800 rounded-full h-2">
+        <div className="flex-1 rounded-full h-2" style={{ backgroundColor: "#1e293b" }}>
           <div
-            className={clsx(
-              "h-2 rounded-full transition-all duration-1000",
-              timeRatio > 0.5
-                ? "bg-accent-500"
-                : timeRatio > 0.2
-                ? "bg-warn-500"
-                : "bg-danger-500"
-            )}
-            style={{ width: `${timeRatio * 100}%` }}
+            className="h-2 rounded-full transition-all duration-1000"
+            style={{
+              width: `${timeRatio * 100}%`,
+              backgroundColor:
+                timeRatio > 0.5 ? "#10b981" :
+                timeRatio > 0.2 ? "#f59e0b" :
+                "#ef4444",
+            }}
           />
         </div>
         <span className={clsx("font-mono font-bold text-lg flex-shrink-0", timerColor)}>
@@ -310,18 +318,16 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
       {/* Questions */}
       <div className="space-y-4">
         {questions.map((q, idx) => {
-          const options =
-            q.options ?? (q.type === "true_false" ? ["Vrai", "Faux"] : []);
+          const options = q.options ?? (q.type === "true_false" ? ["Vrai", "Faux"] : []);
           return (
             <div key={q.id} className="card space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
-                  <span className="bg-surface-800 border border-surface-600 text-brand-300 text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0">
+                  <span className="border border-surface-600 text-indigo-300 text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0"
+                    style={{ backgroundColor: "#1e293b" }}>
                     Q{idx + 1}
                   </span>
-                  <p className="font-medium text-slate-100 text-sm leading-relaxed">
-                    {q.question}
-                  </p>
+                  <p className="font-medium text-slate-100 text-sm leading-relaxed">{q.question}</p>
                 </div>
                 <span className="text-xs text-slate-500 flex-shrink-0">{q.points}pt</span>
               </div>
@@ -331,15 +337,14 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
                   {options.map((opt) => (
                     <button
                       key={opt}
-                      onClick={() =>
-                        setAnswers((prev) => ({ ...prev, [q.id]: opt }))
-                      }
+                      onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: opt }))}
                       className={clsx(
                         "text-left px-3 py-2.5 rounded-xl border text-sm transition-all",
                         answers[q.id] === opt
-                          ? "border-brand-500 bg-brand-900/30 text-brand-300"
+                          ? "border-indigo-500 text-indigo-300"
                           : "border-surface-700 text-slate-400 hover:border-surface-600 hover:text-slate-200"
                       )}
+                      style={answers[q.id] === opt ? { backgroundColor: "rgba(99,102,241,0.15)" } : {}}
                     >
                       {opt}
                     </button>
@@ -348,9 +353,7 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
               ) : (
                 <textarea
                   value={answers[q.id] ?? ""}
-                  onChange={(e) =>
-                    setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                  }
+                  onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
                   placeholder="Rédigez votre réponse…"
                   rows={3}
                   className="input ml-8 resize-none text-sm"
@@ -361,7 +364,6 @@ export default function ExamPanel({ courseId, courseTitle }: Props) {
         })}
       </div>
 
-      {/* Submit button */}
       <button onClick={submitExam} className="btn-primary w-full gap-2 py-3">
         <CheckCircle className="w-4 h-4" />
         Rendre ma copie ({Object.keys(answers).length}/{questions.length} réponses)
