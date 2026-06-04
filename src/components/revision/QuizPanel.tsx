@@ -14,6 +14,30 @@ interface Props {
   courseId: string;
 }
 
+/**
+ * Normalise une string pour la comparaison :
+ * retire les espaces, met en minuscules, retire la ponctuation de début type "A. " ou "A) "
+ */
+function normalize(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-d][.)]\s*/i, "") // retire "A. " "B) " etc.
+    .replace(/\s+/g, " ");
+}
+
+function isCorrect(selected: string, correct: string): boolean {
+  // Comparaison exacte d'abord
+  if (selected === correct) return true;
+  // Comparaison normalisée
+  if (normalize(selected) === normalize(correct)) return true;
+  // Vérifier si correct_answer est contenu dans selected ou vice-versa
+  const sel = normalize(selected);
+  const cor = normalize(correct);
+  if (sel.includes(cor) || cor.includes(sel)) return true;
+  return false;
+}
+
 export default function QuizPanel({ questions, courseId }: Props) {
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -24,15 +48,13 @@ export default function QuizPanel({ questions, courseId }: Props) {
   const isOnline = useOnlineStatus();
 
   const q = questions[current];
+  const options = q.options ?? (q.type === "true_false" ? ["Vrai", "Faux"] : []);
 
   const confirm = () => {
     if (!selected) return;
-    const isCorrect = selected === q.correct_answer;
-    if (isCorrect) setScore((s) => s + 1);
-    setAnswers((prev) => ({
-      ...prev,
-      [q.id]: { answer: selected, correct: isCorrect },
-    }));
+    const correct = isCorrect(selected, q.correct_answer);
+    if (correct) setScore((s) => s + 1);
+    setAnswers((prev) => ({ ...prev, [q.id]: { answer: selected, correct } }));
     setConfirmed(true);
   };
 
@@ -49,13 +71,11 @@ export default function QuizPanel({ questions, courseId }: Props) {
 
   const saveScore = async () => {
     const total = questions.length;
-    const finalScore = score + (answers[q.id] ? 0 : selected === q.correct_answer ? 1 : 0);
-
     const scoreObj = {
       id: `quiz_${courseId}_${Date.now()}`,
       courseId,
       mode: "quiz" as const,
-      score: finalScore,
+      score,
       total,
       feedback: null,
       createdAt: new Date().toISOString(),
@@ -64,9 +84,9 @@ export default function QuizPanel({ questions, courseId }: Props) {
     if (isOnline) {
       const supabase = createClient();
       await supabase.from("quiz_scores").insert({
-        course_id: scoreObj.courseId,
-        mode: scoreObj.mode,
-        score: finalScore,
+        course_id: courseId,
+        mode: "quiz",
+        score,
         total,
         synced: true,
       });
@@ -92,36 +112,28 @@ export default function QuizPanel({ questions, courseId }: Props) {
         <div className="text-5xl">{pct >= 80 ? "🏆" : pct >= 50 ? "📈" : "📖"}</div>
         <div>
           <p className="font-display text-3xl font-bold text-slate-50">{pct}%</p>
-          <p className="text-slate-400">
-            {score}/{questions.length} bonnes réponses
-          </p>
+          <p className="text-slate-400">{score}/{questions.length} bonnes réponses</p>
         </div>
 
-        {/* Answer review */}
         <div className="w-full space-y-2 mt-2 text-left">
           {questions.map((q) => {
             const a = answers[q.id];
             if (!a) return null;
             return (
-              <div
-                key={q.id}
-                className={`flex items-start gap-2 p-3 rounded-xl border text-sm ${
+              <div key={q.id}
+                className={clsx(
+                  "flex items-start gap-2 p-3 rounded-xl border text-sm",
                   a.correct
                     ? "bg-accent-900/10 border-accent-700/30"
                     : "bg-danger-900/10 border-danger-700/30"
-                }`}
-              >
-                {a.correct ? (
-                  <CheckCircle className="w-4 h-4 text-accent-400 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
-                )}
+                )}>
+                {a.correct
+                  ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
                 <div>
                   <p className="text-slate-200 font-medium leading-snug">{q.question}</p>
                   {!a.correct && (
-                    <p className="text-xs text-accent-400 mt-1">
-                      ✓ {q.correct_answer}
-                    </p>
+                    <p className="text-xs text-emerald-400 mt-1">✓ {q.correct_answer}</p>
                   )}
                   {q.explanation && (
                     <p className="text-xs text-slate-500 mt-1">{q.explanation}</p>
@@ -140,16 +152,17 @@ export default function QuizPanel({ questions, courseId }: Props) {
     );
   }
 
-  const options = q.options ?? ["Vrai", "Faux"];
-
   return (
     <div className="card space-y-5">
       {/* Progress */}
       <div className="flex items-center gap-3">
         <div className="flex-1 bg-surface-800 rounded-full h-1.5">
           <div
-            className="bg-gradient-to-r from-accent-500 to-brand-500 h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${((current) / questions.length) * 100}%` }}
+            className="h-1.5 rounded-full transition-all duration-300"
+            style={{
+              width: `${(current / questions.length) * 100}%`,
+              background: "linear-gradient(to right, #6366f1, #10b981)",
+            }}
           />
         </div>
         <span className="text-xs text-slate-400 font-mono">
@@ -171,41 +184,41 @@ export default function QuizPanel({ questions, courseId }: Props) {
       <div className="space-y-2">
         {options.map((option) => {
           const isSelected = selected === option;
-          const isCorrect = option === q.correct_answer;
+          const optionIsCorrect = isCorrect(option, q.correct_answer);
 
-          let optionClass = "border-surface-700 hover:border-brand-600/50 hover:bg-brand-900/10";
+          let optionClass = "border-surface-700 hover:border-indigo-600 hover:bg-indigo-900/10";
           if (confirmed) {
-            if (isCorrect) optionClass = "border-accent-600/60 bg-accent-900/20 text-accent-300";
-            else if (isSelected && !isCorrect) optionClass = "border-danger-600/60 bg-danger-900/20 text-danger-300";
-            else optionClass = "border-surface-700 opacity-50";
+            if (optionIsCorrect) optionClass = "border-emerald-600/60 bg-emerald-900/20 text-emerald-300";
+            else if (isSelected && !optionIsCorrect) optionClass = "border-red-600/60 bg-red-900/20 text-red-300";
+            else optionClass = "border-surface-700 opacity-40";
           } else if (isSelected) {
-            optionClass = "border-brand-500 bg-brand-900/20 text-brand-300";
+            optionClass = "border-indigo-500 bg-indigo-900/20 text-indigo-300";
           }
 
           return (
             <button
               key={option}
               onClick={() => !confirmed && setSelected(option)}
+              disabled={confirmed}
               className={clsx(
                 "w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150",
                 optionClass
               )}
-              disabled={confirmed}
             >
               <div className="flex items-center gap-3">
                 <span
                   className={clsx(
                     "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all",
-                    isSelected && !confirmed
-                      ? "border-brand-400 bg-brand-400"
-                      : confirmed && isCorrect
-                      ? "border-accent-400 bg-accent-400"
-                      : confirmed && isSelected && !isCorrect
-                      ? "border-danger-400 bg-danger-400"
+                    confirmed && optionIsCorrect
+                      ? "border-emerald-400 bg-emerald-400"
+                      : confirmed && isSelected && !optionIsCorrect
+                      ? "border-red-400 bg-red-400"
+                      : isSelected
+                      ? "border-indigo-400 bg-indigo-400"
                       : "border-surface-600"
                   )}
                 >
-                  {(isSelected || (confirmed && isCorrect)) && (
+                  {(isSelected || (confirmed && optionIsCorrect)) && (
                     <span className="w-2 h-2 rounded-full bg-white" />
                   )}
                 </span>
@@ -216,17 +229,17 @@ export default function QuizPanel({ questions, courseId }: Props) {
         })}
       </div>
 
-      {/* Explanation after confirm */}
+      {/* Explication après confirmation */}
       {confirmed && q.explanation && (
-        <div className="p-3 bg-surface-800 rounded-xl border border-surface-700">
+        <div className="p-3 rounded-xl border border-surface-700 bg-surface-800">
           <p className="text-xs text-slate-400">
-            <span className="text-brand-400 font-medium">Explication : </span>
+            <span className="text-indigo-400 font-medium">Explication : </span>
             {q.explanation}
           </p>
         </div>
       )}
 
-      {/* Action button */}
+      {/* Bouton action */}
       {!confirmed ? (
         <button onClick={confirm} disabled={!selected} className="btn-primary w-full">
           Valider ma réponse
