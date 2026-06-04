@@ -14,34 +14,26 @@ interface Props {
   courseId: string;
 }
 
-/**
- * Normalise une string pour la comparaison stricte :
- * - trim + minuscules
- * - retire UNIQUEMENT le préfixe de lettre isolé "A. " "B) " "a- " etc.
- */
 function normalize(str: string): string {
   return str
     .trim()
     .toLowerCase()
-    // Retire un préfixe de type "A. " "B) " "c- " SEULEMENT si c'est une lettre seule suivie de ponctuation
-    .replace(/^([a-d])[.):\-]\s+/i, "")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    // Supprimer les caractères invisibles et espaces non-standard
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, "")
+    // Retirer préfixe lettre isolée "A. " "B) " etc.
+    .replace(/^[a-d][.):\-]\s*/i, "");
 }
 
-/**
- * Comparaison stricte : deux réponses sont égales seulement si
- * leur forme normalisée est IDENTIQUE (pas de includes pour éviter les faux positifs)
- */
 function isCorrect(selected: string, correct: string): boolean {
-  const sel = normalize(selected);
-  const cor = normalize(correct);
-  return sel === cor;
+  return normalize(selected) === normalize(correct);
 }
 
 export default function QuizPanel({ questions, courseId }: Props) {
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [userWasCorrect, setUserWasCorrect] = useState(false);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [answers, setAnswers] = useState<Record<string, { answer: string; correct: boolean }>>({});
@@ -54,6 +46,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
     if (!selected) return;
     const correct = isCorrect(selected, q.correct_answer);
     if (correct) setScore((s) => s + 1);
+    setUserWasCorrect(correct);
     setAnswers((prev) => ({ ...prev, [q.id]: { answer: selected, correct } }));
     setConfirmed(true);
   };
@@ -63,6 +56,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
       setCurrent((c) => c + 1);
       setSelected(null);
       setConfirmed(false);
+      setUserWasCorrect(false);
     } else {
       setFinished(true);
       await saveScore();
@@ -70,16 +64,6 @@ export default function QuizPanel({ questions, courseId }: Props) {
   };
 
   const saveScore = async () => {
-    const scoreObj = {
-      id: `quiz_${courseId}_${Date.now()}`,
-      courseId,
-      mode: "quiz" as const,
-      score,
-      total: questions.length,
-      feedback: null,
-      createdAt: new Date().toISOString(),
-    };
-
     if (isOnline) {
       const supabase = createClient();
       await supabase.from("quiz_scores").insert({
@@ -90,7 +74,15 @@ export default function QuizPanel({ questions, courseId }: Props) {
         synced: true,
       });
     } else {
-      await savePendingScore(scoreObj);
+      await savePendingScore({
+        id: `quiz_${courseId}_${Date.now()}`,
+        courseId,
+        mode: "quiz",
+        score,
+        total: questions.length,
+        feedback: null,
+        createdAt: new Date().toISOString(),
+      });
       toast("Score sauvegardé hors-ligne", { icon: "📶" });
     }
   };
@@ -99,6 +91,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
     setCurrent(0);
     setSelected(null);
     setConfirmed(false);
+    setUserWasCorrect(false);
     setScore(0);
     setFinished(false);
     setAnswers({});
@@ -113,39 +106,29 @@ export default function QuizPanel({ questions, courseId }: Props) {
           <p className="font-display text-3xl font-bold text-slate-50">{pct}%</p>
           <p className="text-slate-400">{score}/{questions.length} bonnes réponses</p>
         </div>
-
         <div className="w-full space-y-2 mt-2 text-left">
           {questions.map((q) => {
             const a = answers[q.id];
             if (!a) return null;
             return (
-              <div key={q.id}
-                className={clsx(
-                  "flex items-start gap-2 p-3 rounded-xl border text-sm",
-                  a.correct
-                    ? "bg-emerald-900/10 border-emerald-700/30"
-                    : "bg-red-900/10 border-red-700/30"
-                )}>
+              <div key={q.id} className={clsx(
+                "flex items-start gap-2 p-3 rounded-xl border text-sm",
+                a.correct ? "bg-emerald-900/10 border-emerald-700/30" : "bg-red-900/10 border-red-700/30"
+              )}>
                 {a.correct
                   ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
                 <div>
                   <p className="text-slate-200 font-medium leading-snug">{q.question}</p>
-                  {!a.correct && (
-                    <p className="text-xs text-emerald-400 mt-1">✓ {q.correct_answer}</p>
-                  )}
-                  {q.explanation && (
-                    <p className="text-xs text-slate-500 mt-1">{q.explanation}</p>
-                  )}
+                  {!a.correct && <p className="text-xs text-emerald-400 mt-1">✓ {q.correct_answer}</p>}
+                  {q.explanation && <p className="text-xs text-slate-500 mt-1">{q.explanation}</p>}
                 </div>
               </div>
             );
           })}
         </div>
-
         <button onClick={restart} className="btn-secondary gap-2">
-          <RotateCcw className="w-4 h-4" />
-          Refaire le quiz
+          <RotateCcw className="w-4 h-4" /> Refaire le quiz
         </button>
       </div>
     );
@@ -155,18 +138,11 @@ export default function QuizPanel({ questions, courseId }: Props) {
     <div className="card space-y-5">
       {/* Progress */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 bg-surface-800 rounded-full h-1.5">
-          <div
-            className="h-1.5 rounded-full transition-all duration-300"
-            style={{
-              width: `${(current / questions.length) * 100}%`,
-              background: "linear-gradient(to right, #6366f1, #10b981)",
-            }}
-          />
+        <div className="flex-1 rounded-full h-1.5" style={{ backgroundColor: "#1e293b" }}>
+          <div className="h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${(current / questions.length) * 100}%`, background: "linear-gradient(to right, #6366f1, #10b981)" }} />
         </div>
-        <span className="text-xs text-slate-400 font-mono">
-          {current + 1}/{questions.length}
-        </span>
+        <span className="text-xs text-slate-400 font-mono">{current + 1}/{questions.length}</span>
       </div>
 
       {/* Question */}
@@ -174,63 +150,72 @@ export default function QuizPanel({ questions, courseId }: Props) {
         <span className="badge-brand text-xs mb-3 inline-block">
           {q.type === "mcq" ? "QCM" : "Vrai / Faux"}
         </span>
-        <p className="font-display font-semibold text-slate-100 leading-relaxed">
-          {q.question}
-        </p>
+        <p className="font-display font-semibold text-slate-100 leading-relaxed">{q.question}</p>
       </div>
 
       {/* Options */}
       <div className="space-y-2">
         {options.map((option) => {
           const isSelected = selected === option;
-          // Après confirmation : est-ce que CETTE option est la bonne ?
-          const optionIsCorrect = confirmed && isCorrect(option, q.correct_answer);
-          // Après confirmation : est-ce que j'ai sélectionné cette option ET elle est fausse ?
-          const optionIsWrong = confirmed && isSelected && !isCorrect(option, q.correct_answer);
+          // Après confirmation : cette option est-elle la correcte ?
+          const isTheCorrectAnswer = confirmed && isCorrect(option, q.correct_answer);
+          // Après confirmation : j'ai sélectionné cette option et elle est fausse ?
+          const isMyWrongAnswer = confirmed && isSelected && !userWasCorrect;
 
-          let style: React.CSSProperties = {};
-          let className = "w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150 ";
+          // Déterminer les styles
+          let bgColor = "transparent";
+          let borderColor = "#334155";
+          let textColor = "#94a3b8";
 
-          if (optionIsCorrect) {
-            className += "border-emerald-600/60 text-emerald-300";
-            style = { backgroundColor: "rgba(16,185,129,0.15)" };
-          } else if (optionIsWrong) {
-            className += "border-red-600/60 text-red-300";
-            style = { backgroundColor: "rgba(239,68,68,0.15)" };
-          } else if (confirmed) {
-            className += "border-surface-700 opacity-40";
-          } else if (isSelected) {
-            className += "border-indigo-500 text-indigo-300";
-            style = { backgroundColor: "rgba(99,102,241,0.15)" };
+          if (!confirmed) {
+            if (isSelected) {
+              bgColor = "rgba(99,102,241,0.15)";
+              borderColor = "#6366f1";
+              textColor = "#a5b4fc";
+            } else {
+              borderColor = "#334155";
+              textColor = "#94a3b8";
+            }
           } else {
-            className += "border-surface-700 text-slate-300 hover:border-indigo-600/50 hover:bg-indigo-900/10";
+            if (isTheCorrectAnswer) {
+              // Toujours vert si c'est la bonne réponse
+              bgColor = "rgba(16,185,129,0.15)";
+              borderColor = "#10b981";
+              textColor = "#6ee7b7";
+            } else if (isMyWrongAnswer) {
+              // Rouge uniquement si j'ai sélectionné CETTE option ET que c'est faux
+              bgColor = "rgba(239,68,68,0.15)";
+              borderColor = "#ef4444";
+              textColor = "#fca5a5";
+            } else {
+              // Griser les autres options
+              bgColor = "transparent";
+              borderColor = "#1e293b";
+              textColor = "#475569";
+            }
           }
+
+          const dotColor = !confirmed && isSelected ? "#6366f1"
+            : isTheCorrectAnswer ? "#10b981"
+            : isMyWrongAnswer ? "#ef4444"
+            : "#334155";
+
+          const showDot = isSelected || isTheCorrectAnswer;
 
           return (
             <button
               key={option}
               onClick={() => !confirmed && setSelected(option)}
               disabled={confirmed}
-              className={className}
-              style={style}
+              className="w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150"
+              style={{ backgroundColor: bgColor, borderColor, color: textColor }}
             >
               <div className="flex items-center gap-3">
                 <span
                   className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                  style={{
-                    borderColor: optionIsCorrect ? "#10b981"
-                      : optionIsWrong ? "#ef4444"
-                      : isSelected && !confirmed ? "#6366f1"
-                      : "#475569",
-                    backgroundColor: optionIsCorrect ? "#10b981"
-                      : optionIsWrong ? "#ef4444"
-                      : isSelected && !confirmed ? "#6366f1"
-                      : "transparent",
-                  }}
+                  style={{ borderColor: dotColor, backgroundColor: showDot ? dotColor : "transparent" }}
                 >
-                  {(isSelected || optionIsCorrect) && (
-                    <span className="w-2 h-2 rounded-full bg-white" />
-                  )}
+                  {showDot && <span className="w-2 h-2 rounded-full bg-white" />}
                 </span>
                 {option}
               </div>
@@ -239,17 +224,31 @@ export default function QuizPanel({ questions, courseId }: Props) {
         })}
       </div>
 
+      {/* Feedback visuel sous les options */}
+      {confirmed && (
+        <div className={clsx(
+          "flex items-center gap-2 p-3 rounded-xl text-sm font-medium",
+          userWasCorrect
+            ? "bg-emerald-900/20 border border-emerald-700/40 text-emerald-300"
+            : "bg-red-900/20 border border-red-700/40 text-red-300"
+        )}>
+          {userWasCorrect
+            ? <><CheckCircle className="w-4 h-4 flex-shrink-0" /> Bonne réponse !</>
+            : <><XCircle className="w-4 h-4 flex-shrink-0" /> Mauvaise réponse — la bonne était : <strong className="text-emerald-400 ml-1">{q.correct_answer}</strong></>
+          }
+        </div>
+      )}
+
       {/* Explication */}
       {confirmed && q.explanation && (
         <div className="p-3 rounded-xl border border-surface-700" style={{ backgroundColor: "#1e293b" }}>
           <p className="text-xs text-slate-400">
-            <span className="text-indigo-400 font-medium">Explication : </span>
-            {q.explanation}
+            <span className="text-indigo-400 font-medium">Explication : </span>{q.explanation}
           </p>
         </div>
       )}
 
-      {/* Bouton action */}
+      {/* Bouton */}
       {!confirmed ? (
         <button onClick={confirm} disabled={!selected} className="btn-primary w-full">
           Valider ma réponse
