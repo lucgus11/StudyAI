@@ -15,27 +15,27 @@ interface Props {
 }
 
 /**
- * Normalise une string pour la comparaison :
- * retire les espaces, met en minuscules, retire la ponctuation de début type "A. " ou "A) "
+ * Normalise une string pour la comparaison stricte :
+ * - trim + minuscules
+ * - retire UNIQUEMENT le préfixe de lettre isolé "A. " "B) " "a- " etc.
  */
 function normalize(str: string): string {
   return str
     .trim()
     .toLowerCase()
-    .replace(/^[a-d][.)]\s*/i, "") // retire "A. " "B) " etc.
+    // Retire un préfixe de type "A. " "B) " "c- " SEULEMENT si c'est une lettre seule suivie de ponctuation
+    .replace(/^([a-d])[.):\-]\s+/i, "")
     .replace(/\s+/g, " ");
 }
 
+/**
+ * Comparaison stricte : deux réponses sont égales seulement si
+ * leur forme normalisée est IDENTIQUE (pas de includes pour éviter les faux positifs)
+ */
 function isCorrect(selected: string, correct: string): boolean {
-  // Comparaison exacte d'abord
-  if (selected === correct) return true;
-  // Comparaison normalisée
-  if (normalize(selected) === normalize(correct)) return true;
-  // Vérifier si correct_answer est contenu dans selected ou vice-versa
   const sel = normalize(selected);
   const cor = normalize(correct);
-  if (sel.includes(cor) || cor.includes(sel)) return true;
-  return false;
+  return sel === cor;
 }
 
 export default function QuizPanel({ questions, courseId }: Props) {
@@ -70,13 +70,12 @@ export default function QuizPanel({ questions, courseId }: Props) {
   };
 
   const saveScore = async () => {
-    const total = questions.length;
     const scoreObj = {
       id: `quiz_${courseId}_${Date.now()}`,
       courseId,
       mode: "quiz" as const,
       score,
-      total,
+      total: questions.length,
       feedback: null,
       createdAt: new Date().toISOString(),
     };
@@ -87,7 +86,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
         course_id: courseId,
         mode: "quiz",
         score,
-        total,
+        total: questions.length,
         synced: true,
       });
     } else {
@@ -124,8 +123,8 @@ export default function QuizPanel({ questions, courseId }: Props) {
                 className={clsx(
                   "flex items-start gap-2 p-3 rounded-xl border text-sm",
                   a.correct
-                    ? "bg-accent-900/10 border-accent-700/30"
-                    : "bg-danger-900/10 border-danger-700/30"
+                    ? "bg-emerald-900/10 border-emerald-700/30"
+                    : "bg-red-900/10 border-red-700/30"
                 )}>
                 {a.correct
                   ? <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -184,15 +183,27 @@ export default function QuizPanel({ questions, courseId }: Props) {
       <div className="space-y-2">
         {options.map((option) => {
           const isSelected = selected === option;
-          const optionIsCorrect = isCorrect(option, q.correct_answer);
+          // Après confirmation : est-ce que CETTE option est la bonne ?
+          const optionIsCorrect = confirmed && isCorrect(option, q.correct_answer);
+          // Après confirmation : est-ce que j'ai sélectionné cette option ET elle est fausse ?
+          const optionIsWrong = confirmed && isSelected && !isCorrect(option, q.correct_answer);
 
-          let optionClass = "border-surface-700 hover:border-indigo-600 hover:bg-indigo-900/10";
-          if (confirmed) {
-            if (optionIsCorrect) optionClass = "border-emerald-600/60 bg-emerald-900/20 text-emerald-300";
-            else if (isSelected && !optionIsCorrect) optionClass = "border-red-600/60 bg-red-900/20 text-red-300";
-            else optionClass = "border-surface-700 opacity-40";
+          let style: React.CSSProperties = {};
+          let className = "w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150 ";
+
+          if (optionIsCorrect) {
+            className += "border-emerald-600/60 text-emerald-300";
+            style = { backgroundColor: "rgba(16,185,129,0.15)" };
+          } else if (optionIsWrong) {
+            className += "border-red-600/60 text-red-300";
+            style = { backgroundColor: "rgba(239,68,68,0.15)" };
+          } else if (confirmed) {
+            className += "border-surface-700 opacity-40";
           } else if (isSelected) {
-            optionClass = "border-indigo-500 bg-indigo-900/20 text-indigo-300";
+            className += "border-indigo-500 text-indigo-300";
+            style = { backgroundColor: "rgba(99,102,241,0.15)" };
+          } else {
+            className += "border-surface-700 text-slate-300 hover:border-indigo-600/50 hover:bg-indigo-900/10";
           }
 
           return (
@@ -200,25 +211,24 @@ export default function QuizPanel({ questions, courseId }: Props) {
               key={option}
               onClick={() => !confirmed && setSelected(option)}
               disabled={confirmed}
-              className={clsx(
-                "w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150",
-                optionClass
-              )}
+              className={className}
+              style={style}
             >
               <div className="flex items-center gap-3">
                 <span
-                  className={clsx(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all",
-                    confirmed && optionIsCorrect
-                      ? "border-emerald-400 bg-emerald-400"
-                      : confirmed && isSelected && !optionIsCorrect
-                      ? "border-red-400 bg-red-400"
-                      : isSelected
-                      ? "border-indigo-400 bg-indigo-400"
-                      : "border-surface-600"
-                  )}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                  style={{
+                    borderColor: optionIsCorrect ? "#10b981"
+                      : optionIsWrong ? "#ef4444"
+                      : isSelected && !confirmed ? "#6366f1"
+                      : "#475569",
+                    backgroundColor: optionIsCorrect ? "#10b981"
+                      : optionIsWrong ? "#ef4444"
+                      : isSelected && !confirmed ? "#6366f1"
+                      : "transparent",
+                  }}
                 >
-                  {(isSelected || (confirmed && optionIsCorrect)) && (
+                  {(isSelected || optionIsCorrect) && (
                     <span className="w-2 h-2 rounded-full bg-white" />
                   )}
                 </span>
@@ -229,9 +239,9 @@ export default function QuizPanel({ questions, courseId }: Props) {
         })}
       </div>
 
-      {/* Explication après confirmation */}
+      {/* Explication */}
       {confirmed && q.explanation && (
-        <div className="p-3 rounded-xl border border-surface-700 bg-surface-800">
+        <div className="p-3 rounded-xl border border-surface-700" style={{ backgroundColor: "#1e293b" }}>
           <p className="text-xs text-slate-400">
             <span className="text-indigo-400 font-medium">Explication : </span>
             {q.explanation}
