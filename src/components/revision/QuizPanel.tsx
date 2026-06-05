@@ -14,19 +14,55 @@ interface Props {
   courseId: string;
 }
 
-function normalize(str: string): string {
-  return str
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    // Supprimer les caractères invisibles et espaces non-standard
-    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, "")
-    // Retirer préfixe lettre isolée "A. " "B) " etc.
-    .replace(/^[a-d][.):\-]\s*/i, "");
+/**
+ * Extrait la lettre de préfixe d'une option : "A) Texte" → "a", "B. Texte" → "b"
+ * Retourne null si pas de préfixe lettre
+ */
+function extractPrefix(str: string): string | null {
+  const match = str.trim().match(/^([a-d])[.):\-\s]/i);
+  return match ? match[1].toLowerCase() : null;
 }
 
-function isCorrect(selected: string, correct: string): boolean {
-  return normalize(selected) === normalize(correct);
+/**
+ * Vérifie si une option correspond à la correct_answer.
+ * Gère tous les cas que l'IA peut générer :
+ * - correct_answer = texte complet "Avoir un esprit sain..."
+ * - correct_answer = lettre seule "B" ou "b"
+ * - correct_answer = "B) Avoir un esprit sain..."
+ */
+function isCorrect(option: string, correctAnswer: string): boolean {
+  const optNorm = option.trim().toLowerCase().replace(/[\u00A0\u200B\uFEFF]/g, "");
+  const corNorm = correctAnswer.trim().toLowerCase().replace(/[\u00A0\u200B\uFEFF]/g, "");
+
+  // 1. Égalité exacte (normalisée)
+  if (optNorm === corNorm) return true;
+
+  // 2. correct_answer est une lettre seule ("b", "B")
+  //    → vérifier si l'option commence par cette lettre
+  if (/^[a-d]$/i.test(correctAnswer.trim())) {
+    const optPrefix = extractPrefix(option);
+    if (optPrefix && optPrefix === corNorm) return true;
+  }
+
+  // 3. correct_answer commence par une lettre ("B) texte", "B. texte")
+  //    → extraire la lettre de correct_answer et comparer avec le préfixe de l'option
+  const corPrefix = extractPrefix(correctAnswer);
+  if (corPrefix) {
+    const optPrefix = extractPrefix(option);
+    if (optPrefix && optPrefix === corPrefix) return true;
+
+    // Aussi : comparer le texte sans préfixe
+    const corText = corNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
+    const optText = optNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
+    if (corText && optText && corText === optText) return true;
+  }
+
+  // 4. Comparer sans les préfixes (texte pur)
+  const optText = optNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
+  const corText = corNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
+  if (optText && corText && optText === corText) return true;
+
+  return false;
 }
 
 export default function QuizPanel({ questions, courseId }: Props) {
@@ -157,12 +193,9 @@ export default function QuizPanel({ questions, courseId }: Props) {
       <div className="space-y-2">
         {options.map((option) => {
           const isSelected = selected === option;
-          // Après confirmation : cette option est-elle la correcte ?
-          const isTheCorrectAnswer = confirmed && isCorrect(option, q.correct_answer);
-          // Après confirmation : j'ai sélectionné cette option et elle est fausse ?
+          const isTheCorrectAnswer = confirmed && optionMatchesCorrect(option, q.correct_answer);
           const isMyWrongAnswer = confirmed && isSelected && !userWasCorrect;
 
-          // Déterminer les styles
           let bgColor = "transparent";
           let borderColor = "#334155";
           let textColor = "#94a3b8";
@@ -172,34 +205,26 @@ export default function QuizPanel({ questions, courseId }: Props) {
               bgColor = "rgba(99,102,241,0.15)";
               borderColor = "#6366f1";
               textColor = "#a5b4fc";
-            } else {
-              borderColor = "#334155";
-              textColor = "#94a3b8";
             }
           } else {
             if (isTheCorrectAnswer) {
-              // Toujours vert si c'est la bonne réponse
               bgColor = "rgba(16,185,129,0.15)";
               borderColor = "#10b981";
               textColor = "#6ee7b7";
             } else if (isMyWrongAnswer) {
-              // Rouge uniquement si j'ai sélectionné CETTE option ET que c'est faux
               bgColor = "rgba(239,68,68,0.15)";
               borderColor = "#ef4444";
               textColor = "#fca5a5";
             } else {
-              // Griser les autres options
-              bgColor = "transparent";
               borderColor = "#1e293b";
               textColor = "#475569";
             }
           }
 
-          const dotColor = !confirmed && isSelected ? "#6366f1"
-            : isTheCorrectAnswer ? "#10b981"
+          const dotColor = isTheCorrectAnswer ? "#10b981"
             : isMyWrongAnswer ? "#ef4444"
+            : isSelected && !confirmed ? "#6366f1"
             : "#334155";
-
           const showDot = isSelected || isTheCorrectAnswer;
 
           return (
@@ -212,7 +237,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
                   style={{ borderColor: dotColor, backgroundColor: showDot ? dotColor : "transparent" }}
                 >
                   {showDot && <span className="w-2 h-2 rounded-full bg-white" />}
@@ -224,17 +249,19 @@ export default function QuizPanel({ questions, courseId }: Props) {
         })}
       </div>
 
-      {/* Feedback visuel sous les options */}
+      {/* Feedback */}
       {confirmed && (
         <div className={clsx(
           "flex items-center gap-2 p-3 rounded-xl text-sm font-medium",
           userWasCorrect
-            ? "bg-emerald-900/20 border border-emerald-700/40 text-emerald-300"
-            : "bg-red-900/20 border border-red-700/40 text-red-300"
-        )}>
+            ? "border border-emerald-700/40 text-emerald-300"
+            : "border border-red-700/40 text-red-300"
+        )}
+          style={{ backgroundColor: userWasCorrect ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)" }}>
           {userWasCorrect
             ? <><CheckCircle className="w-4 h-4 flex-shrink-0" /> Bonne réponse !</>
-            : <><XCircle className="w-4 h-4 flex-shrink-0" /> Mauvaise réponse — la bonne était : <strong className="text-emerald-400 ml-1">{q.correct_answer}</strong></>
+            : <><XCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Mauvaise réponse — la bonne était : <strong className="text-emerald-400">{q.correct_answer}</strong></span></>
           }
         </div>
       )}
