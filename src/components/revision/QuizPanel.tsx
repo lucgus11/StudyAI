@@ -14,56 +14,49 @@ interface Props {
   courseId: string;
 }
 
-/**
- * Extrait la lettre de préfixe d'une option : "A) Texte" → "a", "B. Texte" → "b"
- * Retourne null si pas de préfixe lettre
- */
-function extractPrefix(str: string): string | null {
-  const match = str.trim().match(/^([a-d])[.):\-\s]/i);
-  return match ? match[1].toLowerCase() : null;
+// ---------------------------------------------------------------------------
+// Helpers de comparaison de réponses
+// ---------------------------------------------------------------------------
+
+function normalize(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, "")
+    .replace(/^[a-d][.):\-]\s*/i, "");
 }
 
 /**
- * Vérifie si une option correspond à la correct_answer.
- * Gère tous les cas que l'IA peut générer :
- * - correct_answer = texte complet "Avoir un esprit sain..."
- * - correct_answer = lettre seule "B" ou "b"
- * - correct_answer = "B) Avoir un esprit sain..."
+ * Vérifie si une OPTION correspond à la bonne réponse.
+ * Gère le cas où correct_answer est une lettre seule "B"
+ * et l'option est "B) Texte complet".
  */
-function isCorrect(option: string, correctAnswer: string): boolean {
-  const optNorm = option.trim().toLowerCase().replace(/[\u00A0\u200B\uFEFF]/g, "");
-  const corNorm = correctAnswer.trim().toLowerCase().replace(/[\u00A0\u200B\uFEFF]/g, "");
+function optionMatchesCorrect(option: string, correct: string): boolean {
+  // Comparaison normalisée directe
+  if (normalize(option) === normalize(correct)) return true;
 
-  // 1. Égalité exacte (normalisée)
-  if (optNorm === corNorm) return true;
-
-  // 2. correct_answer est une lettre seule ("b", "B")
-  //    → vérifier si l'option commence par cette lettre
-  if (/^[a-d]$/i.test(correctAnswer.trim())) {
-    const optPrefix = extractPrefix(option);
-    if (optPrefix && optPrefix === corNorm) return true;
+  // correct_answer est une lettre seule (ex: "B", "A", "C", "D")
+  if (/^[a-d]$/i.test(correct.trim())) {
+    const letter = correct.trim().toLowerCase();
+    // L'option commence-t-elle par cette lettre suivie de ponctuation ?
+    return /^[a-d][.):\-\s]/i.test(option.trim()) &&
+      option.trim().toLowerCase().startsWith(letter);
   }
-
-  // 3. correct_answer commence par une lettre ("B) texte", "B. texte")
-  //    → extraire la lettre de correct_answer et comparer avec le préfixe de l'option
-  const corPrefix = extractPrefix(correctAnswer);
-  if (corPrefix) {
-    const optPrefix = extractPrefix(option);
-    if (optPrefix && optPrefix === corPrefix) return true;
-
-    // Aussi : comparer le texte sans préfixe
-    const corText = corNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
-    const optText = optNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
-    if (corText && optText && corText === optText) return true;
-  }
-
-  // 4. Comparer sans les préfixes (texte pur)
-  const optText = optNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
-  const corText = corNorm.replace(/^[a-d][.):\-\s]+/i, "").trim();
-  if (optText && corText && optText === corText) return true;
 
   return false;
 }
+
+/**
+ * Vérifie si la réponse sélectionnée par l'utilisateur est correcte.
+ */
+function isCorrect(selected: string, correct: string): boolean {
+  return optionMatchesCorrect(selected, correct);
+}
+
+// ---------------------------------------------------------------------------
+// Composant principal
+// ---------------------------------------------------------------------------
 
 export default function QuizPanel({ questions, courseId }: Props) {
   const [current, setCurrent] = useState(0);
@@ -133,6 +126,7 @@ export default function QuizPanel({ questions, courseId }: Props) {
     setAnswers({});
   };
 
+  // ---- Résultats finaux ----
   if (finished) {
     const pct = Math.round((score / questions.length) * 100);
     return (
@@ -156,8 +150,12 @@ export default function QuizPanel({ questions, courseId }: Props) {
                   : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
                 <div>
                   <p className="text-slate-200 font-medium leading-snug">{q.question}</p>
-                  {!a.correct && <p className="text-xs text-emerald-400 mt-1">✓ {q.correct_answer}</p>}
-                  {q.explanation && <p className="text-xs text-slate-500 mt-1">{q.explanation}</p>}
+                  {!a.correct && (
+                    <p className="text-xs text-emerald-400 mt-1">✓ {q.correct_answer}</p>
+                  )}
+                  {q.explanation && (
+                    <p className="text-xs text-slate-500 mt-1">{q.explanation}</p>
+                  )}
                 </div>
               </div>
             );
@@ -170,13 +168,19 @@ export default function QuizPanel({ questions, courseId }: Props) {
     );
   }
 
+  // ---- Question en cours ----
   return (
     <div className="card space-y-5">
-      {/* Progress */}
+      {/* Barre de progression */}
       <div className="flex items-center gap-3">
         <div className="flex-1 rounded-full h-1.5" style={{ backgroundColor: "#1e293b" }}>
-          <div className="h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${(current / questions.length) * 100}%`, background: "linear-gradient(to right, #6366f1, #10b981)" }} />
+          <div
+            className="h-1.5 rounded-full transition-all duration-300"
+            style={{
+              width: `${(current / questions.length) * 100}%`,
+              background: "linear-gradient(to right, #6366f1, #10b981)",
+            }}
+          />
         </div>
         <span className="text-xs text-slate-400 font-mono">{current + 1}/{questions.length}</span>
       </div>
@@ -221,10 +225,11 @@ export default function QuizPanel({ questions, courseId }: Props) {
             }
           }
 
-          const dotColor = isTheCorrectAnswer ? "#10b981"
+          const dotColor = !confirmed && isSelected ? "#6366f1"
+            : isTheCorrectAnswer ? "#10b981"
             : isMyWrongAnswer ? "#ef4444"
-            : isSelected && !confirmed ? "#6366f1"
             : "#334155";
+
           const showDot = isSelected || isTheCorrectAnswer;
 
           return (
@@ -237,8 +242,11 @@ export default function QuizPanel({ questions, courseId }: Props) {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                  style={{ borderColor: dotColor, backgroundColor: showDot ? dotColor : "transparent" }}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                  style={{
+                    borderColor: dotColor,
+                    backgroundColor: showDot ? dotColor : "transparent",
+                  }}
                 >
                   {showDot && <span className="w-2 h-2 rounded-full bg-white" />}
                 </span>
@@ -249,19 +257,17 @@ export default function QuizPanel({ questions, courseId }: Props) {
         })}
       </div>
 
-      {/* Feedback */}
+      {/* Bandeau feedback */}
       {confirmed && (
         <div className={clsx(
           "flex items-center gap-2 p-3 rounded-xl text-sm font-medium",
           userWasCorrect
-            ? "border border-emerald-700/40 text-emerald-300"
-            : "border border-red-700/40 text-red-300"
-        )}
-          style={{ backgroundColor: userWasCorrect ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)" }}>
+            ? "bg-emerald-900/20 border border-emerald-700/40 text-emerald-300"
+            : "bg-red-900/20 border border-red-700/40 text-red-300"
+        )}>
           {userWasCorrect
             ? <><CheckCircle className="w-4 h-4 flex-shrink-0" /> Bonne réponse !</>
-            : <><XCircle className="w-4 h-4 flex-shrink-0" />
-              <span>Mauvaise réponse — la bonne était : <strong className="text-emerald-400">{q.correct_answer}</strong></span></>
+            : <><XCircle className="w-4 h-4 flex-shrink-0" /> Mauvaise réponse — la bonne était : <strong className="text-emerald-400 ml-1">{q.correct_answer}</strong></>
           }
         </div>
       )}
@@ -270,12 +276,13 @@ export default function QuizPanel({ questions, courseId }: Props) {
       {confirmed && q.explanation && (
         <div className="p-3 rounded-xl border border-surface-700" style={{ backgroundColor: "#1e293b" }}>
           <p className="text-xs text-slate-400">
-            <span className="text-indigo-400 font-medium">Explication : </span>{q.explanation}
+            <span className="text-indigo-400 font-medium">Explication : </span>
+            {q.explanation}
           </p>
         </div>
       )}
 
-      {/* Bouton */}
+      {/* Bouton action */}
       {!confirmed ? (
         <button onClick={confirm} disabled={!selected} className="btn-primary w-full">
           Valider ma réponse
