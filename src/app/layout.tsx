@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 import "./globals.css";
 
 const syne = Syne({
@@ -25,17 +26,14 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "StudyAI – Révision Intelligente",
-  description:
-    "Ton assistant IA pour réviser intelligemment, créer des flashcards, des quiz et planifier tes révisions.",
+  description: "Ton assistant IA pour réviser intelligemment et réussir tes examens.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "StudyAI",
   },
-  icons: {
-    apple: "/icons/icon-192x192.png",
-  },
+  icons: { apple: "/icons/icon-192x192.png" },
 };
 
 export const viewport: Viewport = {
@@ -54,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="font-body bg-surface-950 text-slate-100 antialiased">
+        <ServiceWorkerRegister />
         {children}
         <Toaster
           position="top-right"
