@@ -18,7 +18,7 @@ function getGroqClient(): Groq {
 async function chat(systemPrompt: string, userMessage: string, maxTokens = 4096): Promise<string> {
   const groq = getGroqClient();
   const completion = await groq.chat.completions.create({
-    model: "llama-3.1-8b-instant",
+    model: "openai/gpt-oss-120b",
     max_tokens: maxTokens,
     temperature: 0.3,
     messages: [
