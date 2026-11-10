@@ -193,7 +193,7 @@ Génère ${count} questions basées sur CE contenu :
 Mélange : 60% mcq, 40% true_false.`
     : `En tant que professeur en "${subject}", génère ${count} questions d'examen sur "${title}".
 Format JSON : [{ "id": "q_1", "question": "Question précise sur ${title}", "type": "mcq|true_false", "options": ["A","B","C","D"], "correct_answer": "...", "explanation": "Explication académique" }]
-Les questions doivent tester des CONNAISSANCES RÉELLES sur "${title}" en "${subject}".`;
+Les questions doivent tester des CONNAISSANCES RÉELLES sur "${title}" en "${subject}" et les correct_answer ne doivent pas être une lettre mais la bonne réponse.`;
 
   const raw = await chat(system, user, 4000);
   return parseJSON<QuizQuestion[]>(raw);
